@@ -1,0 +1,682 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users & Auth
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String?
+  role         UserRole @default(CLIENT_USER)
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  priorAuthCases    PriorAuthCase[]    @relation("AssignedSpecialist")
+  eligibilityChecks EligibilityCheck[]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  FINANCE_ADMIN
+  STAFFINGLY_ADMIN
+  STAFFINGLY_SUPERVISOR
+  STAFFINGLY_SPECIALIST
+  CLIENT_USER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clients
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Client {
+  id           String       @id @default(cuid())
+  name         String
+  practiceName String?
+  contactEmail String?
+  contactPhone String?
+  address      String?
+  status       ClientStatus @default(ACTIVE)
+  onboardedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  users              User[]
+  billingProfile     BillingProfile?
+  storageConfig      ClientStorageConfig?
+  priorAuthCases     PriorAuthCase[]
+  eligibilityChecks  EligibilityCheck[]
+  invoices           Invoice[]
+  notifications      Notification[]
+  unmatchedDocuments UnmatchedDocument[]
+  driveSyncLogs      DriveSyncLog[]
+  automationJobs     AutomationJob[]
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ONBOARDING
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BillingProfile {
+  id                  String          @id @default(cuid())
+  clientId            String          @unique
+  client              Client          @relation(fields: [clientId], references: [id])
+  stripeCustomerId    String?
+  billingContactName  String?
+  billingContactEmail String?
+  pricingPackageId    String?
+  pricingPackage      PricingPackage? @relation(fields: [pricingPackageId], references: [id])
+  taxRate             Float           @default(0)
+  disputeWindowHours  Int             @default(24)
+  billingPaused       Boolean         @default(false)
+  accountFlagged      Boolean         @default(false)
+  flagReason          String?
+  cardBrand           String?
+  cardLast4           String?
+  cardExpMonth        Int?
+  cardExpYear         Int?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+}
+
+model PricingPackage {
+  id                        String   @id @default(cuid())
+  name                      String
+  description               String?
+  monthlyBaseFee            Float    @default(0)
+  ratePerEligibilityCheck   Float    @default(0)
+  ratePerPriorAuth          Float    @default(0)
+  ratePerApprovedPriorAuth  Float    @default(0)
+  ratePerAppeal             Float    @default(0)
+  includedEligibilityChecks Int      @default(0)
+  includedPriorAuths        Int      @default(0)
+  includedAppeals           Int      @default(0)
+  unlimitedEligibility      Boolean  @default(false)
+  unlimitedPriorAuths       Boolean  @default(false)
+  unlimitedAppeals          Boolean  @default(false)
+  chargeOnApproval          Boolean  @default(false)
+  overageRateEligibility    Float?
+  overageRatePriorAuth      Float?
+  isActive                  Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  billingProfiles BillingProfile[]
+}
+
+model Invoice {
+  id                    String        @id @default(cuid())
+  invoiceNumber         String        @unique
+  clientId              String
+  client                Client        @relation(fields: [clientId], references: [id])
+  clientName            String
+  billingPeriodStart    DateTime
+  billingPeriodEnd      DateTime
+  lineItemsJson         String        @db.Text
+  subtotal              Float
+  taxAmount             Float         @default(0)
+  creditsApplied        Float         @default(0)
+  totalAmount           Float
+  status                InvoiceStatus @default(DISPUTE_WINDOW)
+  disputeWindowOpensAt  DateTime?
+  disputeWindowClosesAt DateTime?
+  paidAt                DateTime?
+  paymentFailedAt       DateTime?
+  stripePaymentIntentId String?
+  stripeErrorCode       String?
+  stripeErrorMessage    String?
+  retryScheduledAt      DateTime?
+  pricingPackageName    String?
+  generatedBy           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  credits BillingCredit[]
+}
+
+enum InvoiceStatus {
+  DISPUTE_WINDOW
+  PENDING
+  PAID
+  PAYMENT_FAILED
+  DISPUTED
+  VOIDED
+}
+
+model BillingCredit {
+  id                 String    @id @default(cuid())
+  clientId           String
+  amount             Float
+  reason             String?
+  periodStart        DateTime?
+  periodEnd          DateTime?
+  appliedToInvoiceId String?
+  appliedToInvoice   Invoice?  @relation(fields: [appliedToInvoiceId], references: [id])
+  createdAt          DateTime  @default(now())
+}
+
+model BillingAuditLog {
+  id          String   @id @default(cuid())
+  eventType   String
+  clientId    String?
+  clientName  String?
+  invoiceId   String?
+  description String   @db.Text
+  performedBy String
+  performedAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Eligibility
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EligibilityCheck {
+  id                  String          @id @default(cuid())
+  clientId            String
+  client              Client          @relation(fields: [clientId], references: [id])
+  patientName         String
+  patientDob          DateTime?
+  memberId            String?
+  payerId             String?
+  payerName           String?
+  providerNpi         String?
+  serviceTypeCode     String?
+  serviceDate         DateTime?
+  coverageStatus      CoverageStatus?
+  planName            String?
+  planType            String?
+  networkStatus       String?
+  effectiveDate       DateTime?
+  terminationDate     DateTime?
+  groupNumber         String?
+  benefitsRaw         String?         @db.Text
+  confidenceScore     Int?
+  responseTimeSeconds Float?
+  channelUsed         String?
+  flags               String[]
+  requiresHumanReview Boolean         @default(false)
+  rawResponse         String?         @db.Text
+  errorMessage        String?
+  performedById       String?
+  performedBy         User?           @relation(fields: [performedById], references: [id])
+  createdAt           DateTime        @default(now())
+}
+
+enum CoverageStatus {
+  ACTIVE
+  INACTIVE
+  UNKNOWN
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prior Authorization
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PriorAuthCase {
+  id                    String          @id @default(cuid())
+  caseNumber            String          @unique
+  clientId              String
+  client                Client          @relation(fields: [clientId], references: [id])
+  patientName           String?
+  patientInitials       String?
+  patientDob            DateTime?
+  insuranceId           String?
+  payerName             String?
+  payerId               String?
+  serviceType           String?
+  diagnosisCodes        String[]
+  procedureCodes        String[]
+  requestingProvider    String?
+  requestingProviderNpi String?
+  urgency               CaseUrgency     @default(ROUTINE)
+  status                PriorAuthStatus @default(INTAKE)
+  assignedSpecialistId  String?
+  assignedSpecialist    User?           @relation("AssignedSpecialist", fields: [assignedSpecialistId], references: [id])
+  eligibilityVerified   Boolean         @default(false)
+  eligibilityCheckId    String?
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  deniedAt              DateTime?
+  denialReason          String?
+  appealSubmittedAt     DateTime?
+  authorizationNumber   String?
+  authValidFrom         DateTime?
+  authValidTo           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  documents PriorAuthDocument[]
+}
+
+enum CaseUrgency {
+  ROUTINE
+  URGENT
+  EXPEDITED
+}
+
+enum PriorAuthStatus {
+  INTAKE
+  PENDING_DOCUMENTS
+  READY_FOR_SUBMISSION
+  SUBMITTED
+  APPROVED
+  DENIED
+  APPEAL_IN_PROGRESS
+  PEER_TO_PEER_REQUESTED
+  CLOSED
+}
+
+model PriorAuthDocument {
+  id                  String         @id @default(cuid())
+  caseId              String
+  case                PriorAuthCase  @relation(fields: [caseId], references: [id])
+  documentType        String
+  checklistItemKey    String?
+  fileName            String
+  fileUrl             String
+  status              DocumentStatus @default(PENDING)
+  aiClassification    String?
+  aiExtractedDataJson String?        @db.Text
+  uploadedBy          String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+enum DocumentStatus {
+  PENDING
+  UPLOADED
+  VERIFIED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Payer Rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PayerRule {
+  id                  String   @id @default(cuid())
+  payerName           String
+  payerId             String?
+  serviceType         String?
+  requiresPriorAuth   Boolean  @default(true)
+  submissionMethod    String?
+  portalUrl           String?
+  phoneNumber         String?
+  faxNumber           String?
+  turnaroundDays      Int?
+  requiredDocuments   String[]
+  automationSupported Boolean  @default(false)
+  fieldMappingJson    String?  @db.Text
+  notes               String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Automation
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AutomationJob {
+  id                 String              @id @default(cuid())
+  jobId              String              @unique
+  jobType            String
+  clientId           String?
+  client             Client?             @relation(fields: [clientId], references: [id])
+  caseId             String?
+  payerName          String
+  urgency            CaseUrgency         @default(ROUTINE)
+  status             AutomationJobStatus @default(QUEUED)
+  queuePosition      Int?
+  queuedAt           DateTime            @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  triggeredBy        String?
+  errorType          String?
+  errorMessage       String?
+  resultJson         String?             @db.Text
+  confirmationNumber String?
+  screenshotUrls     String[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+enum AutomationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document Storage
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ClientStorageConfig {
+  id                     String      @id @default(cuid())
+  clientId               String      @unique
+  client                 Client      @relation(fields: [clientId], references: [id])
+  clientName             String?
+  storageType            StorageType @default(STAFFINGLY_PORTAL)
+  credentialKeyRef       String?
+  syncEnabled            Boolean     @default(true)
+  folderStructureCreated Boolean     @default(false)
+  rootFolderId           String?
+  incomingFolderId       String?
+  processedFolderId      String?
+  archiveFolderId        String?
+  reportsFolderId        String?
+  connectionVerified     Boolean     @default(false)
+  connectionVerifiedAt   DateTime?
+  lastSyncAt             DateTime?
+  lastSyncStatus         String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+}
+
+enum StorageType {
+  STAFFINGLY_PORTAL
+  GOOGLE_DRIVE
+  ONEDRIVE
+  DROPBOX
+}
+
+model UnmatchedDocument {
+  id                         String    @id @default(cuid())
+  clientId                   String
+  client                     Client    @relation(fields: [clientId], references: [id])
+  clientName                 String?
+  fileName                   String
+  fileUrl                    String
+  storageType                String?
+  detectedDocumentType       String?
+  aiClassificationConfidence Float?
+  extractedPatientInitials   String?
+  extractedDob               DateTime?
+  extractedInsuranceId       String?
+  extractedDiagnosisCodes    String[]
+  extractedPhysician         String?
+  extractedDataJson          String?   @db.Text
+  matchConfidence            Float?
+  suggestedCaseId            String?
+  status                     String    @default("Unmatched")
+  detectedAt                 DateTime  @default(now())
+  resolvedAt                 DateTime?
+  resolvedBy                 String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+}
+
+model DriveSyncLog {
+  id              String    @id @default(cuid())
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id])
+  clientName      String?
+  storageType     String?
+  syncStartedAt   DateTime
+  syncCompletedAt DateTime?
+  status          String
+  filesDetected   Int       @default(0)
+  filesMatched    Int       @default(0)
+  filesUnmatched  Int       @default(0)
+  filesErrored    Int       @default(0)
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications & Audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id               String   @id @default(cuid())
+  clientId         String?
+  client           Client?  @relation(fields: [clientId], references: [id])
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id])
+  type             String
+  title            String
+  body             String   @db.Text
+  relatedInvoiceId String?
+  relatedCaseId    String?
+  read             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  details    String?  @db.Text
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy Staff model (keep for backwards compatibility)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Staff {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  department String
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscribers & Providers
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Subscriber {
+  id                  String    @id @default(cuid())
+  clientId            String
+  firstName           String?
+  lastName            String
+  dob                 String?
+  memberId            String?
+  payer               String?
+  payerId             String?
+  planType            String?
+  groupNumber         String?
+  lastCoverageStatus  String?
+  lastVerifiedDate    String?
+  lastConfidenceScore Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Provider {
+  id          String   @id @default(cuid())
+  clientId    String
+  firstName   String?
+  lastName    String
+  npi         String?
+  specialty   String?
+  taxonomy    String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Knowledge Base
+// ─────────────────────────────────────────────────────────────────────────────
+
+model KnowledgeBaseEntry {
+  id           String   @id @default(cuid())
+  clientId     String
+  title        String
+  content      String   @db.Text
+  category     String?
+  tags         String[]
+  accessCount  Int      @default(0)
+  published    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatbotConversation {
+  id           String   @id @default(cuid())
+  clientId     String
+  sessionId    String
+  messagesJson String   @db.Text
+  rating       Int?
+  feedback     String?
+  createdAt    DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Eligibility History (for frontend compatibility)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EligibilityHistory {
+  id                        String   @id @default(cuid())
+  subscriberId              String?
+  clientId                  String?
+  providerId                String?
+  subscriberName            String?
+  payer                     String?
+  memberId                  String?
+  providerNpi               String?
+  serviceDate               String?
+  coverageStatus            String?
+  planName                  String?
+  planType                  String?
+  networkStatus             String?
+  effectiveDate             String?
+  terminationDate           String?
+  deductibleIndividualTotal Float?
+  deductibleIndividualMet   Float?
+  oopMaxIndividual          Float?
+  copayPcp                  Float?
+  copaySpecialist           Float?
+  coinsuranceIn             Float?
+  confidenceScore           Int?
+  flagsJson                 String?
+  requiresHumanReview       Boolean  @default(false)
+  rawResponseJson           String?  @db.Text
+  channelUsed               String?
+  responseTimeSeconds       Float?
+  verifiedBy                String?
+  createdAt                 DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Client Branding & Messaging
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ClientBranding {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  primaryColor    String?
+  secondaryColor  String?
+  accentColor     String?
+  logoUrl         String?
+  faviconUrl      String?
+  companyName     String?
+  welcomeMessage  String?  @db.Text
+  customCss       String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CaseMessage {
+  id           String   @id @default(cuid())
+  caseId       String
+  clientId     String?
+  senderId     String?
+  senderName   String?
+  senderRole   String?
+  message      String   @db.Text
+  readByClient Boolean  @default(false)
+  readByStaff  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Payroll
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PayrollRate {
+  id               String   @id @default(cuid())
+  userId           String
+  ratePerCase      Float    @default(0)
+  ratePerHour      Float    @default(0)
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PayrollAdjustment {
+  id             String   @id @default(cuid())
+  userId         String
+  payPeriodStart String
+  payPeriodEnd   String
+  adjustmentType String
+  amount         Float
+  reason         String?
+  approvedBy     String?
+  createdAt      DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity Logging
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DailyActivityLog {
+  id            String   @id @default(cuid())
+  specialistId  String
+  date          String
+  casesWorked   Int      @default(0)
+  casesApproved Int      @default(0)
+  casesDenied   Int      @default(0)
+  hoursLogged   Float    @default(0)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model StaffinglyAuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  userEmail   String?
+  action      String
+  entityType  String?
+  entityId    String?
+  description String   @db.Text
+  metadata    String?  @db.Text
+  createdAt   DateTime @default(now())
+}

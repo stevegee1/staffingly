@@ -1,0 +1,263 @@
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
+import { RefreshCw, CheckCircle, XCircle, Loader2, Activity, Clock } from "lucide-react";
+
+const STORAGE_LABELS = {
+  google_drive: "Google Drive",
+  onedrive: "OneDrive",
+  dropbox: "Dropbox",
+  staffingly_portal: "Staffingly Portal",
+};
+
+export default function DriveSyncLogs() {
+  const [user, setUser] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("All");
+
+  useEffect(() => {
+    api.auth
+      .me()
+      .then(setUser)
+      .catch(() => api.auth.redirectToLogin());
+    loadLogs();
+  }, []);
+
+  const loadLogs = async () => {
+    setLoading(true);
+    const data = await api.entities.DriveSyncLog.list("-created_date", 100);
+    setLogs(data);
+    setLoading(false);
+  };
+
+  const handleManualSync = async () => {
+    setTriggering(true);
+    await api.functions.invoke("documentIntakeSync", {});
+    await loadLogs();
+    setTriggering(false);
+  };
+
+  const filtered = logs.filter((l) => filterStatus === "All" || l.status === filterStatus);
+
+  // Summary stats
+  const last24h = logs.filter(
+    (l) => l.sync_started_at && Date.now() - new Date(l.sync_started_at).getTime() < 86400000
+  );
+  const totalFiles = last24h.reduce((s, l) => s + (l.files_detected || 0), 0);
+  const totalMatched = last24h.reduce((s, l) => s + (l.files_matched || 0), 0);
+  const totalUnmatched = last24h.reduce((s, l) => s + (l.files_unmatched || 0), 0);
+
+  return (
+    <StaffinglyLayout
+      user={user}
+      currentPage="drive-sync-logs"
+      title="Drive Sync Logs"
+      breadcrumbs={["Documents", "Sync Logs"]}
+    >
+      <div className="max-w-[1400px] mx-auto space-y-5">
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              label: "Sync Runs (24h)",
+              value: last24h.length,
+              color: "#293682",
+              bg: "#eef3ff",
+              icon: Activity,
+            },
+            {
+              label: "Files Detected (24h)",
+              value: totalFiles,
+              color: "#0a7e87",
+              bg: "#f0fdfa",
+              icon: Activity,
+            },
+            {
+              label: "Auto-Matched (24h)",
+              value: totalMatched,
+              color: "#16a34a",
+              bg: "#f0fdf4",
+              icon: CheckCircle,
+            },
+            {
+              label: "Unmatched (24h)",
+              value: totalUnmatched,
+              color: "#d97706",
+              bg: "#fffbeb",
+              icon: XCircle,
+            },
+          ].map((s, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4"
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: s.bg }}
+              >
+                <s.icon className="w-5 h-5" style={{ color: s.color }} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold" style={{ color: s.color }}>
+                  {s.value}
+                </p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Controls */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap gap-3 items-center">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none"
+          >
+            <option>All</option>
+            <option>Completed</option>
+            <option>Running</option>
+            <option>Failed</option>
+          </select>
+          <div className="flex-1" />
+          <button
+            onClick={loadLogs}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+          <button
+            onClick={handleManualSync}
+            disabled={triggering}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-50 hover:opacity-90"
+            style={{ backgroundColor: "#293682" }}
+          >
+            {triggering ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {triggering ? "Syncing…" : "Trigger Manual Sync"}
+          </button>
+        </div>
+
+        {/* Logs Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          {loading ? (
+            <div className="p-12 text-center">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <Activity className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+              <p className="text-sm text-slate-400">No sync logs yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    {[
+                      "Client",
+                      "Storage",
+                      "Started",
+                      "Duration",
+                      "Detected",
+                      "Matched",
+                      "Unmatched",
+                      "Errors",
+                      "Status",
+                    ].map((col) => (
+                      <th
+                        key={col}
+                        className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((log) => {
+                    const dur =
+                      log.sync_started_at && log.sync_completed_at
+                        ? (
+                            (new Date(log.sync_completed_at).getTime() -
+                              new Date(log.sync_started_at).getTime()) /
+                            1000
+                          ).toFixed(1) + "s"
+                        : "—";
+
+                    return (
+                      <tr
+                        key={log.id}
+                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-semibold text-slate-800 text-xs">
+                          {log.client_name || log.client_id?.slice(-8)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">
+                            {STORAGE_LABELS[log.storage_type] || log.storage_type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <Clock className="w-3 h-3" />
+                            {log.sync_started_at
+                              ? new Date(log.sync_started_at).toLocaleString()
+                              : "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500">{dur}</td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-700">
+                          {log.files_detected ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-emerald-600">
+                          {log.files_matched ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-amber-600">
+                          {log.files_unmatched ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-red-500">
+                          {log.files_errored ?? 0}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              log.status === "Completed"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : log.status === "Failed"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-blue-50 text-blue-700"
+                            }`}
+                          >
+                            {log.status === "Completed" ? (
+                              <CheckCircle className="w-3 h-3" />
+                            ) : log.status === "Failed" ? (
+                              <XCircle className="w-3 h-3" />
+                            ) : (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            )}
+                            {log.status}
+                          </span>
+                          {log.error_message && (
+                            <p className="text-[10px] text-red-500 mt-0.5 max-w-[150px] truncate">
+                              {log.error_message}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </StaffinglyLayout>
+  );
+}
