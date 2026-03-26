@@ -43,8 +43,9 @@ router.get(
   "/:id",
   requireRoles(...ALLOWED_ROLES),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const id = req.params.id as string;
     const subscriber = await prisma.subscriber.findUnique({
-      where: { id: req.params.id },
+      where: { id },
     });
 
     if (!subscriber) {
@@ -72,8 +73,9 @@ router.put(
   "/:id",
   requireRoles(...ALLOWED_ROLES),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const id = req.params.id as string;
     const subscriber = await prisma.subscriber.update({
-      where: { id: req.params.id },
+      where: { id },
       data: req.body,
     });
 
@@ -85,8 +87,9 @@ router.delete(
   "/:id",
   requireRoles(...ALLOWED_ROLES),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const id = req.params.id as string;
     await prisma.subscriber.delete({
-      where: { id: req.params.id },
+      where: { id },
     });
 
     res.json({ success: true });
