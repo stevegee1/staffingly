@@ -1,5 +1,4 @@
 import type { Response } from "express";
-import type { File as MulterFile } from "multer";
 import path from "path";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
@@ -8,12 +7,19 @@ import type { AuthenticatedRequest } from "../types/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-interface MulterRequest extends AuthenticatedRequest {
-  file?: MulterFile;
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
 }
 
-export const uploadFile = async (req: MulterRequest, res: Response): Promise<void> => {
-  if (!req.file) {
+export const uploadFile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const file = req.file as MulterFile | undefined;
+
+  if (!file) {
     res.status(400).json({
       success: false,
       message: "No file uploaded",
@@ -26,10 +32,10 @@ export const uploadFile = async (req: MulterRequest, res: Response): Promise<voi
   const uploadsDir = path.join(__dirname, "../../uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
 
-  const filename = `${Date.now()}-${req.file.originalname}`;
+  const filename = `${Date.now()}-${file.originalname}`;
   const filepath = path.join(uploadsDir, filename);
 
-  await fs.writeFile(filepath, req.file.buffer);
+  await fs.writeFile(filepath, file.buffer);
 
   // Return file URL (in production, this would be cloud storage URL)
   const fileUrl = `/uploads/${filename}`;
@@ -38,9 +44,9 @@ export const uploadFile = async (req: MulterRequest, res: Response): Promise<voi
     success: true,
     data: {
       file_url: fileUrl,
-      filename: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+      filename: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype,
     },
   });
 };
