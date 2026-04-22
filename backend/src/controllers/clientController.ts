@@ -35,18 +35,30 @@ interface ListNotificationsQuery {
 interface CreateClientBody {
   name: string;
   practiceName?: string;
+  contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
   address?: string;
+  npi?: string;
+  taxId?: string;
+  emrSystem?: string;
+  cloudStorageType?: string;
+  subdomain?: string;
   status?: ClientStatus;
 }
 
 interface UpdateClientBody {
   name?: string;
   practiceName?: string;
+  contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
   address?: string;
+  npi?: string;
+  taxId?: string;
+  emrSystem?: string;
+  cloudStorageType?: string;
+  subdomain?: string;
   status?: ClientStatus;
 }
 
@@ -78,6 +90,14 @@ export const getClients = async (req: AuthenticatedRequest, res: Response): Prom
       include: {
         billingProfile: true,
         storageConfig: true,
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
         _count: {
           select: {
             users: true,
@@ -154,9 +174,15 @@ export const createClient = async (req: AuthenticatedRequest, res: Response): Pr
     data: {
       name: data.name,
       practiceName: data.practiceName,
+      contactName: data.contactName,
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
       address: data.address,
+      npi: data.npi,
+      taxId: data.taxId,
+      emrSystem: data.emrSystem,
+      cloudStorageType: data.cloudStorageType,
+      subdomain: data.subdomain,
       status: data.status || ClientStatus.ONBOARDING,
     },
     include: {
@@ -180,9 +206,15 @@ export const updateClient = async (req: AuthenticatedRequest, res: Response): Pr
     data: {
       name: data.name,
       practiceName: data.practiceName,
+      contactName: data.contactName,
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
       address: data.address,
+      npi: data.npi,
+      taxId: data.taxId,
+      emrSystem: data.emrSystem,
+      cloudStorageType: data.cloudStorageType,
+      subdomain: data.subdomain,
       status: data.status,
     },
     include: {
@@ -200,8 +232,106 @@ export const updateClient = async (req: AuthenticatedRequest, res: Response): Pr
 export const deleteClient = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
 
-  await prisma.client.delete({
-    where: { id },
+  await prisma.$transaction(async (tx) => {
+    const priorAuthCases = await tx.priorAuthCase.findMany({
+      where: { clientId: id },
+      select: { id: true },
+    });
+
+    const priorAuthCaseIds = priorAuthCases.map((item) => item.id);
+
+    if (priorAuthCaseIds.length > 0) {
+      await tx.priorAuthDocument.deleteMany({
+        where: { caseId: { in: priorAuthCaseIds } },
+      });
+    }
+
+    await tx.insuranceCardUpload.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.patient.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.priorAuthCase.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.eligibilityCheck.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.invoice.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.billingProfile.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.clientStorageConfig.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.unmatchedDocument.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.driveSyncLog.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.clientBranding.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.provider.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.subscriber.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.knowledgeBaseEntry.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.chatbotConversation.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.eligibilityHistory.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.caseMessage.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.billingCredit.deleteMany({
+      where: { clientId: id },
+    });
+
+    await tx.automationJob.updateMany({
+      where: { clientId: id },
+      data: { clientId: null },
+    });
+
+    await tx.notification.updateMany({
+      where: { clientId: id },
+      data: { clientId: null },
+    });
+
+    await tx.user.updateMany({
+      where: { clientId: id },
+      data: { clientId: null },
+    });
+
+    await tx.client.delete({
+      where: { id },
+    });
   });
 
   res.json({

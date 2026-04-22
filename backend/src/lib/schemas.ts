@@ -101,18 +101,30 @@ export const registerSchema = Joi.object({
 export const createClientSchema = Joi.object({
   name: Joi.string().required(),
   practiceName: Joi.string().allow("", null),
+  contactName: Joi.string().allow("", null),
   contactEmail: Joi.string().email().allow("", null),
   contactPhone: Joi.string().allow("", null),
   address: Joi.string().allow("", null),
+  npi: Joi.string().allow("", null),
+  taxId: Joi.string().allow("", null),
+  emrSystem: Joi.string().allow("", null),
+  cloudStorageType: Joi.string().allow("", null),
+  subdomain: Joi.string().allow("", null),
   status: Joi.string().valid("ACTIVE", "INACTIVE", "SUSPENDED", "ONBOARDING").default("ONBOARDING"),
 });
 
 export const updateClientSchema = Joi.object({
   name: Joi.string(),
   practiceName: Joi.string().allow("", null),
+  contactName: Joi.string().allow("", null),
   contactEmail: Joi.string().email().allow("", null),
   contactPhone: Joi.string().allow("", null),
   address: Joi.string().allow("", null),
+  npi: Joi.string().allow("", null),
+  taxId: Joi.string().allow("", null),
+  emrSystem: Joi.string().allow("", null),
+  cloudStorageType: Joi.string().allow("", null),
+  subdomain: Joi.string().allow("", null),
   status: Joi.string().valid("ACTIVE", "INACTIVE", "SUSPENDED", "ONBOARDING"),
 });
 

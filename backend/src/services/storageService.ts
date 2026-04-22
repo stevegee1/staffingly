@@ -1,5 +1,273 @@
 import prisma from "../lib/prisma.js";
 import * as aiService from "./aiService.js";
+import path from "path";
+import fs from "fs/promises";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Insurance Card File Storage (S3 + Local Fallback)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface UploadResult {
+  success: boolean;
+  storageKey: string;
+  storageBucket: string | null;
+  storageType: "s3" | "local";
+  url: string;
+}
+
+interface S3Client {
+  send: (command: unknown) => Promise<unknown>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let s3Client: S3Client | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let S3ClientClass: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let PutObjectCommand: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let GetObjectCommand: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let DeleteObjectCommand: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let getSignedUrl: any = null;
+
+/**
+ * Check if S3 is configured and initialize client
+ */
+async function initS3Client(): Promise<boolean> {
+  const bucket = process.env.AWS_S3_BUCKET;
+  const region = process.env.AWS_S3_REGION || process.env.AWS_REGION;
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
+  if (!bucket || !region || !accessKeyId || !secretAccessKey) {
+    return false;
+  }
+
+  if (!s3Client) {
+    try {
+      // @ts-expect-error - Optional dependency, may not be installed
+      const s3Module = await import("@aws-sdk/client-s3");
+      // @ts-expect-error - Optional dependency, may not be installed
+      const presignerModule = await import("@aws-sdk/s3-request-presigner");
+
+      S3ClientClass = s3Module.S3Client;
+      PutObjectCommand = s3Module.PutObjectCommand;
+      GetObjectCommand = s3Module.GetObjectCommand;
+      DeleteObjectCommand = s3Module.DeleteObjectCommand;
+      getSignedUrl = presignerModule.getSignedUrl;
+
+      s3Client = new S3ClientClass({
+        region,
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
+        },
+      });
+    } catch {
+      console.warn("AWS SDK not installed, using local storage fallback");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Get local uploads directory path
+ */
+function getLocalUploadsDir(): string {
+  return path.join(__dirname, "../../uploads/insurance-cards");
+}
+
+/**
+ * Ensure local uploads directory exists
+ */
+async function ensureLocalUploadsDir(): Promise<void> {
+  const dir = getLocalUploadsDir();
+  await fs.mkdir(dir, { recursive: true });
+}
+
+/**
+ * Generate a unique storage key for an insurance card
+ */
+function generateStorageKey(clientId: string, originalFileName: string): string {
+  const timestamp = Date.now();
+  const randomId = crypto.randomBytes(8).toString("hex");
+  const ext = path.extname(originalFileName);
+  const safeName = path.basename(originalFileName, ext).replace(/[^a-zA-Z0-9-_]/g, "_");
+  return `insurance-cards/${clientId}/${timestamp}-${randomId}-${safeName}${ext}`;
+}
+
+/**
+ * Upload an insurance card image to storage (S3 or local)
+ */
+export async function uploadInsuranceCard(
+  buffer: Buffer,
+  originalFileName: string,
+  mimeType: string,
+  clientId: string
+): Promise<UploadResult> {
+  const storageKey = generateStorageKey(clientId, originalFileName);
+  const useS3 = await initS3Client();
+
+  if (useS3 && s3Client && PutObjectCommand) {
+    // Upload to S3 with server-side encryption
+    const bucket = process.env.AWS_S3_BUCKET!;
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+      Body: buffer,
+      ContentType: mimeType,
+      ServerSideEncryption: "AES256",
+      // Tag for lifecycle policy (30-day expiration)
+      Tagging: "retention=30days",
+    });
+
+    await s3Client.send(command);
+
+    return {
+      success: true,
+      storageKey,
+      storageBucket: bucket,
+      storageType: "s3",
+      url: `s3://${bucket}/${storageKey}`,
+    };
+  } else {
+    // Fall back to local storage
+    await ensureLocalUploadsDir();
+    const localPath = path.join(getLocalUploadsDir(), storageKey.replace("insurance-cards/", ""));
+
+    // Ensure subdirectory exists
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.writeFile(localPath, buffer);
+
+    return {
+      success: true,
+      storageKey,
+      storageBucket: null,
+      storageType: "local",
+      url: `/uploads/insurance-cards/${storageKey.replace("insurance-cards/", "")}`,
+    };
+  }
+}
+
+/**
+ * Get a URL for accessing an insurance card (presigned URL for S3, direct path for local)
+ */
+export async function getInsuranceCardUrl(
+  storageKey: string,
+  storageBucket: string | null,
+  storageType: "s3" | "local"
+): Promise<string> {
+  if (storageType === "s3" && storageBucket) {
+    const useS3 = await initS3Client();
+
+    if (useS3 && s3Client && GetObjectCommand && getSignedUrl) {
+      const command = new GetObjectCommand({
+        Bucket: storageBucket,
+        Key: storageKey,
+      });
+
+      // Generate presigned URL valid for 1 hour
+      const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      return url;
+    }
+  }
+
+  // Local storage - return direct path
+  return `/uploads/insurance-cards/${storageKey.replace("insurance-cards/", "")}`;
+}
+
+/**
+ * Delete an insurance card from storage
+ */
+export async function deleteInsuranceCard(
+  storageKey: string,
+  storageBucket: string | null,
+  storageType: "s3" | "local"
+): Promise<boolean> {
+  try {
+    if (storageType === "s3" && storageBucket) {
+      const useS3 = await initS3Client();
+
+      if (useS3 && s3Client && DeleteObjectCommand) {
+        const command = new DeleteObjectCommand({
+          Bucket: storageBucket,
+          Key: storageKey,
+        });
+
+        await s3Client.send(command);
+        return true;
+      }
+    }
+
+    // Local storage
+    const localPath = path.join(getLocalUploadsDir(), storageKey.replace("insurance-cards/", ""));
+    await fs.unlink(localPath);
+    return true;
+  } catch (error) {
+    console.error("Error deleting insurance card:", error);
+    return false;
+  }
+}
+
+/**
+ * Clean up expired local insurance card uploads (for cron job)
+ * Deletes files older than 30 days
+ */
+export async function cleanupExpiredLocalCards(): Promise<number> {
+  const uploadsDir = getLocalUploadsDir();
+  let deletedCount = 0;
+
+  try {
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+    async function cleanDir(dir: string): Promise<void> {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          await cleanDir(fullPath);
+          // Remove empty directories
+          const contents = await fs.readdir(fullPath);
+          if (contents.length === 0) {
+            await fs.rmdir(fullPath);
+          }
+        } else {
+          const stats = await fs.stat(fullPath);
+          if (stats.mtimeMs < thirtyDaysAgo) {
+            await fs.unlink(fullPath);
+            deletedCount++;
+          }
+        }
+      }
+    }
+
+    await cleanDir(uploadsDir);
+  } catch (error) {
+    // Directory might not exist yet
+    console.log("Cleanup skipped:", (error as Error).message);
+  }
+
+  return deletedCount;
+}
+
+/**
+ * Check if S3 storage is available
+ */
+export async function isS3Available(): Promise<boolean> {
+  return await initS3Client();
+}
 
 type StorageType = "STAFFINGLY_PORTAL" | "GOOGLE_DRIVE" | "ONEDRIVE" | "DROPBOX";
 
@@ -528,4 +796,10 @@ export default {
   testConnection,
   createFolderStructure,
   syncDocuments,
+  // Insurance card storage
+  uploadInsuranceCard,
+  getInsuranceCardUrl,
+  deleteInsuranceCard,
+  cleanupExpiredLocalCards,
+  isS3Available,
 };

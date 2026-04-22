@@ -48,9 +48,15 @@ model Client {
   id           String       @id @default(cuid())
   name         String
   practiceName String?
+  contactName  String?
   contactEmail String?
   contactPhone String?
   address      String?
+  npi          String?
+  taxId        String?
+  emrSystem    String?
+  cloudStorageType String?
+  subdomain    String?
   status       ClientStatus @default(ACTIVE)
   onboardedAt  DateTime?
   createdAt    DateTime     @default(now())
@@ -66,6 +72,7 @@ model Client {
   unmatchedDocuments UnmatchedDocument[]
   driveSyncLogs      DriveSyncLog[]
   automationJobs     AutomationJob[]
+  patients           Patient[]
 }
 
 enum ClientStatus {
@@ -682,4 +689,105 @@ model StaffinglyAuditLog {
   description String   @db.Text
   metadata    String?  @db.Text
   createdAt   DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Patient & Insurance Intake
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Patient {
+  id         String    @id @default(cuid())
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id])
+  firstName  String
+  lastName   String
+  middleName String?
+  dob        DateTime
+  gender     String?
+  ssn        String? // Encrypted at rest
+  phone      String?
+  email      String?
+  address    String?
+  city       String?
+  state      String?
+  zip        String?
+  deletedAt  DateTime? // Soft delete
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  insurancePolicies InsurancePolicy[]
+
+  @@index([clientId])
+  @@index([lastName, firstName])
+  @@index([deletedAt])
+}
+
+model InsurancePolicy {
+  id                     String     @id @default(cuid())
+  patientId              String
+  patient                Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  policyType             PolicyType @default(PRIMARY)
+  payerId                String?
+  payerName              String
+  memberId               String
+  groupNumber            String?
+  subscriberName         String?
+  subscriberDob          DateTime?
+  subscriberRelationship String?
+  planName               String?
+  planType               String?
+  effectiveDate          DateTime?
+  terminationDate        DateTime?
+  rxBin                  String?
+  rxPcn                  String?
+  rxGroup                String?
+  copayPcp               Float?
+  copaySpecialist        Float?
+  lastVerifiedAt         DateTime?
+  lastCoverageStatus     String?
+  isActive               Boolean    @default(true)
+  deletedAt              DateTime? // Soft delete
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  cardUploads InsuranceCardUpload[]
+
+  @@index([patientId])
+  @@index([memberId])
+  @@index([deletedAt])
+}
+
+enum PolicyType {
+  PRIMARY
+  SECONDARY
+  TERTIARY
+}
+
+model InsuranceCardUpload {
+  id                String           @id @default(cuid())
+  policyId          String?
+  policy            InsurancePolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  patientId         String?
+  clientId          String
+  cardSide          String // FRONT, BACK
+  originalFileName  String
+  storageKey        String // S3 key or local path
+  storageBucket     String? // S3 bucket name (null for local)
+  storageType       String  @default("local") // "s3" or "local"
+  mimeType          String
+  fileSize          Int
+  extractedData     Json?
+  confidenceScores  Json? // Per-field confidence scores
+  overallConfidence Int?
+  requiresReview    Boolean  @default(false)
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  uploadedBy        String?
+  expiresAt         DateTime // 30-day retention
+  createdAt         DateTime @default(now())
+
+  @@index([policyId])
+  @@index([patientId])
+  @@index([clientId])
+  @@index([expiresAt])
 }
