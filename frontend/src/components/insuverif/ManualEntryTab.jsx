@@ -1,20 +1,8 @@
 import { useState } from "react";
+import { useEntityListQuery } from "@/lib/query";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import AppSelect from "@/components/ui/app-select";
 
-const PAYERS = [
-  "UnitedHealthcare",
-  "Aetna",
-  "Cigna",
-  "Humana",
-  "Blue Cross Blue Shield",
-  "Medicare",
-  "Medicaid",
-  "Tricare",
-  "Molina Healthcare",
-  "Centene",
-  "Oscar Health",
-  "Other",
-];
 const PLAN_TYPES = [
   "PPO",
   "HMO",
@@ -61,6 +49,7 @@ const inputClass =
 const ringStyle = { "--tw-ring-color": "#293682" };
 
 export default function ManualEntryTab({ onSubmit, prefill = {} }) {
+  const { data: payerRules = [] } = useEntityListQuery("PayerRule", { limit: 100 }, null);
   const [form, setForm] = useState({
     first_name: prefill.first_name || "",
     last_name: prefill.last_name || "",
@@ -84,6 +73,11 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
     notes: "",
   });
   const [showSecondary, setShowSecondary] = useState(false);
+  const payerOptions = [
+    ...new Set(
+      payerRules.map((rule) => rule.payerName).filter(Boolean).concat("Other")
+    ),
+  ].map((payer) => ({ label: payer, value: payer }));
 
   const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -126,17 +120,13 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
             />
           </FormInput>
           <FormInput label="Gender">
-            <select
-              className={inputClass}
-              style={ringStyle}
+            <AppSelect
               value={form.gender}
-              onChange={(e) => update("gender", e.target.value)}
-            >
-              <option value="">Select...</option>
-              {GENDERS.map((g) => (
-                <option key={g}>{g}</option>
-              ))}
-            </select>
+              onValueChange={(value) => update("gender", value)}
+              options={GENDERS.map((gender) => ({ label: gender, value: gender }))}
+              placeholder="Select..."
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </FormInput>
           <FormInput label="Phone">
             <input
@@ -165,18 +155,13 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
       <Section title="Insurance Information">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormInput label="Insurance Payer" required>
-            <select
-              className={inputClass}
-              style={ringStyle}
+            <AppSelect
               value={form.payer}
-              onChange={(e) => update("payer", e.target.value)}
-              required
-            >
-              <option value="">Select payer...</option>
-              {PAYERS.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
+              onValueChange={(value) => update("payer", value)}
+              options={payerOptions}
+              placeholder="Select payer..."
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </FormInput>
           <FormInput label="Member ID" required>
             <input
@@ -206,17 +191,13 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
             />
           </FormInput>
           <FormInput label="Plan Type">
-            <select
-              className={inputClass}
-              style={ringStyle}
+            <AppSelect
               value={form.plan_type}
-              onChange={(e) => update("plan_type", e.target.value)}
-            >
-              <option value="">Select type...</option>
-              {PLAN_TYPES.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
+              onValueChange={(value) => update("plan_type", value)}
+              options={PLAN_TYPES.map((type) => ({ label: type, value: type }))}
+              placeholder="Select type..."
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </FormInput>
           <FormInput label="Subscriber Name">
             <input
@@ -237,16 +218,16 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
             />
           </FormInput>
           <FormInput label="Subscriber Relationship">
-            <select
-              className={inputClass}
-              style={ringStyle}
+            <AppSelect
               value={form.subscriber_relationship}
-              onChange={(e) => update("subscriber_relationship", e.target.value)}
-            >
-              {RELATIONSHIPS.map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
+              onValueChange={(value) => update("subscriber_relationship", value)}
+              options={RELATIONSHIPS.map((relationship) => ({
+                label: relationship,
+                value: relationship,
+              }))}
+              placeholder="Select relationship..."
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </FormInput>
         </div>
       </Section>
@@ -306,17 +287,16 @@ export default function ManualEntryTab({ onSubmit, prefill = {} }) {
             />
           </FormInput>
           <FormInput label="Service Type">
-            <select
-              className={inputClass}
-              style={ringStyle}
+            <AppSelect
               value={form.service_type}
-              onChange={(e) => update("service_type", e.target.value)}
-            >
-              <option value="">Select type...</option>
-              {SERVICE_TYPES.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
+              onValueChange={(value) => update("service_type", value)}
+              options={SERVICE_TYPES.map((serviceType) => ({
+                label: serviceType,
+                value: serviceType,
+              }))}
+              placeholder="Select type..."
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </FormInput>
           <FormInput label="CPT Code">
             <input

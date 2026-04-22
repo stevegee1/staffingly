@@ -1,10 +1,32 @@
+import { useEntityListQuery } from "@/lib/query";
 import { Briefcase, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 
-export default function ClientPortalSummary({ user: _user }) {
+export default function ClientPortalSummary({ user }) {
+  const { data: cases = [] } = useEntityListQuery(
+    "PriorAuthCase",
+    { page: 1, limit: 100, clientId: user?.clientId || "" },
+    null,
+    { enabled: Boolean(user?.clientId) }
+  );
+  const { data: messages = [] } = useEntityListQuery(
+    "CaseMessage",
+    { clientId: user?.clientId || "", limit: 20 },
+    null,
+    { enabled: Boolean(user?.clientId) }
+  );
+
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const monthCases = cases.filter((item) => new Date(item.createdAt) >= startOfMonth);
+  const approvals = monthCases.filter((item) => item.status === "APPROVED").length;
+  const denials = monthCases.filter((item) => item.status === "DENIED").length;
+  const latestMessage = [...messages].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0];
+
   const stats = [
-    { label: "Cases This Month", value: 12, icon: Briefcase, color: "#293682", bg: "#eef3ff" },
-    { label: "Approvals", value: 9, icon: CheckCircle, color: "#15803d", bg: "#f0fdf4" },
-    { label: "Denials", value: 2, icon: XCircle, color: "#dc2626", bg: "#fef2f2" },
+    { label: "Cases This Month", value: monthCases.length, icon: Briefcase, color: "#293682", bg: "#eef3ff" },
+    { label: "Approvals", value: approvals, icon: CheckCircle, color: "#15803d", bg: "#f0fdf4" },
+    { label: "Denials", value: denials, icon: XCircle, color: "#dc2626", bg: "#fef2f2" },
   ];
 
   return (
@@ -32,10 +54,15 @@ export default function ClientPortalSummary({ user: _user }) {
         </div>
         <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
           <p className="text-sm text-teal-800">
-            "Hi! We've submitted 3 new prior auth requests to Aetna this week. Expect responses
-            within 3–5 business days. Reach out if you need anything."
+            {latestMessage?.message ||
+              "Your Staffingly updates will appear here as soon as your team posts one."}
           </p>
-          <p className="text-xs text-teal-500 mt-2">— Your Specialist Team · Mar 1, 2026</p>
+          <p className="text-xs text-teal-500 mt-2">
+            — {latestMessage?.senderName || "Your Specialist Team"} ·{" "}
+            {latestMessage?.createdAt
+              ? new Date(latestMessage.createdAt).toLocaleDateString()
+              : "No messages yet"}
+          </p>
         </div>
       </div>
     </div>

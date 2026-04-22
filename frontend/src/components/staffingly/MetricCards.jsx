@@ -8,46 +8,46 @@ import {
   TrendingDown,
 } from "lucide-react";
 
-const METRICS = [
+const DEFAULT_METRICS = [
   {
     label: "Eligibility Today",
-    value: 47,
-    trend: +12,
+    value: 0,
+    trend: 0,
     icon: Search,
     color: "#0a7e87",
     bg: "#f0fdfa",
   },
   {
     label: "Prior Auths In Progress",
-    value: 23,
-    trend: +5,
+    value: 0,
+    trend: 0,
     icon: ClipboardList,
     color: "#293682",
     bg: "#eef3ff",
   },
-  { label: "Submitted Today", value: 18, trend: -2, icon: Send, color: "#f6b037", bg: "#fffbeb" },
+  { label: "Submitted Today", value: 0, trend: 0, icon: Send, color: "#f6b037", bg: "#fffbeb" },
   {
     label: "Approved This Month",
-    value: 312,
-    trend: +34,
+    value: 0,
+    trend: 0,
     icon: CheckCircle,
     color: "#15803d",
     bg: "#f0fdf4",
   },
   {
     label: "Denied This Month",
-    value: 41,
-    trend: -8,
+    value: 0,
+    trend: 0,
     icon: XCircle,
     color: "#dc2626",
     bg: "#fef2f2",
   },
 ];
 
-export default function MetricCards() {
+export default function MetricCards({ metrics = DEFAULT_METRICS }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      {METRICS.map((m, i) => {
+      {metrics.map((m, i) => {
         const isUp = m.trend >= 0;
         return (
           <div

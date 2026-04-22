@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPageUrl } from "@/lib/utils/page";
-import { useAuthUserQuery } from "@/lib/query";
+import { useAuthUserQuery, useEntityListQuery } from "@/lib/query";
+import { api } from "@/lib/api";
 import AppHeader from "@/components/insuverif/AppHeader";
 import StatusBadge from "@/components/insuverif/StatusBadge";
 import ConfidenceGauge from "@/components/insuverif/ConfidenceGauge";
@@ -13,65 +14,8 @@ import {
   Edit3,
   Clock,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
-
-const INITIAL_QUEUE = [
-  {
-    id: "q1",
-    patient_name: "Robert T. Sanchez",
-    payer: "Medicaid",
-    confidence_score: 58,
-    flag_reason: "Coverage termination today",
-    time_waiting: "15 min",
-    assigned_to: "Unassigned",
-    priority: "HIGH",
-    status: "Pending",
-  },
-  {
-    id: "q2",
-    patient_name: "Patricia M. Owens",
-    payer: "UnitedHealthcare",
-    confidence_score: 67,
-    flag_reason: "Prior auth required, not initiated",
-    time_waiting: "1 hr",
-    assigned_to: "Unassigned",
-    priority: "HIGH",
-    status: "Pending",
-  },
-  {
-    id: "q3",
-    patient_name: "Angela B. Torres",
-    payer: "Aetna",
-    confidence_score: 72,
-    flag_reason: "HMO — no PCP referral on file",
-    time_waiting: "2 hrs",
-    assigned_to: "Maria S.",
-    priority: "MEDIUM",
-    status: "In Progress",
-  },
-  {
-    id: "q4",
-    patient_name: "Kevin M. Rhodes",
-    payer: "BCBS",
-    confidence_score: 69,
-    flag_reason: "Member ID format mismatch",
-    time_waiting: "3 hrs",
-    assigned_to: "Unassigned",
-    priority: "MEDIUM",
-    status: "Pending",
-  },
-  {
-    id: "q5",
-    patient_name: "Janet F. Williams",
-    payer: "Humana",
-    confidence_score: 74,
-    flag_reason: "Coverage gap detected — 4 day lapse",
-    time_waiting: "4 hrs",
-    assigned_to: "Unassigned",
-    priority: "LOW",
-    status: "Pending",
-  },
-];
 
 const ACTIONS = [
   { key: "approve", icon: CheckCircle, label: "Approve & Mark Active", color: "#16a34a" },
@@ -192,9 +136,47 @@ function ReviewPanel({ item, onClose, onAction, user }) {
 
 export default function ReviewQueue() {
   const { data: user } = useAuthUserQuery();
-  const [queue, setQueue] = useState(INITIAL_QUEUE);
+  const { data: history = [], isLoading } = useEntityListQuery("EligibilityHistory", { limit: 100 }, null);
+  const [queue, setQueue] = useState([]);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const nextQueue = history
+      .filter(
+        (item) =>
+          item.requiresHumanReview ||
+          item.coverageStatus === "Unknown" ||
+          (item.confidenceScore != null && item.confidenceScore < 75)
+      )
+      .map((item) => {
+        let flags = [];
+        try {
+          flags = item.flagsJson ? JSON.parse(item.flagsJson) : [];
+        } catch {
+          flags = [];
+        }
+
+        return {
+          id: item.id,
+          patient_name: item.subscriberName || "Unknown patient",
+          payer: item.payer || "Unknown payer",
+          confidence_score: item.confidenceScore || 0,
+          flag_reason: flags[0] || "Requires manual review",
+          time_waiting: item.createdAt ? new Date(item.createdAt).toLocaleString() : "—",
+          assigned_to: item.verifiedBy || "Unassigned",
+          priority:
+            item.confidenceScore < 65 || item.coverageStatus === "Inactive"
+              ? "HIGH"
+              : item.confidenceScore < 75
+                ? "MEDIUM"
+                : "LOW",
+          status: item.requiresHumanReview ? "Pending" : "In Progress",
+        };
+      });
+
+    setQueue(nextQueue);
+  }, [history]);
 
   const filtered = queue.filter(
     (q) =>
@@ -202,7 +184,13 @@ export default function ReviewQueue() {
       q.payer.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAction = (id, action, note, reviewerName) => {
+  const handleAction = async (id, action, note, reviewerName) => {
+    await api.entities.EligibilityHistory.update(id, {
+      requires_human_review: action === "escalate",
+      verified_by: reviewerName,
+      flags_json: JSON.stringify([note]),
+    });
+
     setQueue((prev) =>
       prev.map((q) =>
         q.id === id
@@ -296,6 +284,15 @@ export default function ReviewQueue() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {isLoading && (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Loading review queue...
+                      </span>
+                    </td>
+                  </tr>
+                )}
                 {filtered.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">

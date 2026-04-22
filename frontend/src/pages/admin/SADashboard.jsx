@@ -1,4 +1,4 @@
-import { useAuthUserQuery } from "@/lib/query";
+import { useAuthUserQuery, useEntityListQuery } from "@/lib/query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/lib/utils/page";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
@@ -12,56 +12,6 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-const STATS = [
-  { label: "Total Clients", value: "248", icon: Building2, color: "#293682", bg: "#eef3ff" },
-  { label: "Active Users", value: "1,042", icon: Users, color: "#0a7e87", bg: "#f0fdfa" },
-  { label: "Cases This Month", value: "14,830", icon: Activity, color: "#f6b037", bg: "#fffbeb" },
-  { label: "Security Alerts", value: "3", icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2" },
-];
-
-const RECENT_AUDIT = [
-  {
-    user: "admin@staffingly.com",
-    role: "Super Admin",
-    action: "Updated security settings",
-    module: "Security",
-    time: "2 min ago",
-    type: "warning",
-  },
-  {
-    user: "finance@staffingly.com",
-    role: "Finance Admin",
-    action: "Exported payroll report",
-    module: "Payroll",
-    time: "14 min ago",
-    type: "info",
-  },
-  {
-    user: "ops@staffingly.com",
-    role: "Staffingly Admin",
-    action: "Onboarded new client: Sunrise Clinic",
-    module: "Clients",
-    time: "1 hr ago",
-    type: "success",
-  },
-  {
-    user: "specialist@staffingly.com",
-    role: "Specialist",
-    action: "Failed login attempt (IP: 89.34.12.1)",
-    module: "Auth",
-    time: "2 hr ago",
-    type: "danger",
-  },
-  {
-    user: "supervisor@staffingly.com",
-    role: "Supervisor",
-    action: "Approved PA #00382 for Aetna",
-    module: "Cases",
-    time: "3 hr ago",
-    type: "success",
-  },
-];
-
 const TYPE_COLORS = {
   success: { bg: "#f0fdf4", text: "#15803d", dot: "#16a34a" },
   info: { bg: "#eff6ff", text: "#1d4ed8", dot: "#3b82f6" },
@@ -69,8 +19,68 @@ const TYPE_COLORS = {
   danger: { bg: "#fef2f2", text: "#dc2626", dot: "#ef4444" },
 };
 
+function getRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const diffMinutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+  return `${Math.round(diffHours / 24)} day ago`;
+}
+
+function formatRole(role) {
+  return `${role || "Unknown"}`
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function SADashboard() {
   const { data: user } = useAuthUserQuery({ withDefaultRole: "super_admin" });
+  const { data: clients = [] } = useEntityListQuery("Client", { limit: 100 }, null);
+  const { data: users = [] } = useEntityListQuery("User", { limit: 100 }, null);
+  const { data: cases = [] } = useEntityListQuery("PriorAuthCase", { page: 1, limit: 100 }, null);
+  const { data: auditLogs = [] } = useEntityListQuery("StaffinglyAuditLog", { limit: 20 }, null);
+
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const activeUsers = users.filter((item) => item.active).length;
+  const casesThisMonth = cases.filter((item) => new Date(item.createdAt) >= startOfMonth).length;
+  const securityAlerts = auditLogs.filter((item) => {
+    try {
+      const metadata = item.metadata ? JSON.parse(item.metadata) : {};
+      return ["danger", "warning"].includes(metadata.type);
+    } catch {
+      return false;
+    }
+  }).length;
+
+  const stats = [
+    { label: "Total Clients", value: `${clients.length}`, icon: Building2, color: "#293682", bg: "#eef3ff" },
+    { label: "Active Users", value: `${activeUsers}`, icon: Users, color: "#0a7e87", bg: "#f0fdfa" },
+    { label: "Cases This Month", value: `${casesThisMonth}`, icon: Activity, color: "#f6b037", bg: "#fffbeb" },
+    { label: "Security Alerts", value: `${securityAlerts}`, icon: AlertTriangle, color: "#dc2626", bg: "#fef2f2" },
+  ];
+
+  const recentAudit = auditLogs
+    .map((log) => {
+      let metadata = {};
+      try {
+        metadata = log.metadata ? JSON.parse(log.metadata) : {};
+      } catch {
+        metadata = {};
+      }
+
+      return {
+        user: log.userEmail || "Unknown user",
+        role: formatRole(metadata.role),
+        action: log.description,
+        module: metadata.module || log.entityType || "System",
+        time: getRelativeTime(log.createdAt),
+        type: metadata.type || "info",
+      };
+    })
+    .slice(0, 5);
 
   return (
     <StaffinglyLayout
@@ -104,7 +114,7 @@ export default function SADashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {STATS.map((s, i) => (
+          {stats.map((s, i) => (
             <div
               key={i}
               className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-4"
@@ -159,7 +169,7 @@ export default function SADashboard() {
             <span className="text-xs text-slate-400">Last 24 hours — insert-only log</span>
           </div>
           <div className="divide-y divide-slate-50">
-            {RECENT_AUDIT.map((log, i) => {
+            {recentAudit.map((log, i) => {
               const colors = TYPE_COLORS[log.type];
               return (
                 <div

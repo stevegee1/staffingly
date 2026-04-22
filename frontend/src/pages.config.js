@@ -67,8 +67,6 @@ import EligibilityDashboard from "./pages/eligibility/EligibilityDashboard";
 import EligibilityHistory from "./pages/eligibility/EligibilityHistory";
 import FAPayroll from "./pages/finance/FAPayroll";
 import Login from "./pages/authentication/Login";
-import Register from "./pages/authentication/Register";
-import AuthCallback from "./pages/authentication/AuthCallback";
 import ForgotPassword from "./pages/authentication/ForgotPassword";
 import ResetPassword from "./pages/authentication/ResetPassword";
 import KnowledgeBaseAnalytics from "./pages/system/KnowledgeBaseAnalytics";
@@ -115,8 +113,6 @@ export const PAGES = {
   "fa-payroll": FAPayroll,
   home: Dashboard,
   login: Login,
-  register: Register,
-  "auth/callback": AuthCallback,
   "forgot-password": ForgotPassword,
   "reset-password": ResetPassword,
   "knowledge-base-analytics": KnowledgeBaseAnalytics,

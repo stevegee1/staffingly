@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useEntityListQuery } from "@/lib/query";
 import { Search, X, CheckCircle, AlertTriangle, Wifi, WifiOff, Zap, RefreshCw } from "lucide-react";
+import AppSelect from "@/components/ui/app-select";
 import ManualEntryTab from "./ManualEntryTab";
 
 const EHR_SYSTEMS = [
@@ -13,53 +15,12 @@ const EHR_SYSTEMS = [
   { name: "AdvancedMD", protocol: "FHIR STU3", is_connected: false },
 ];
 
-const DUMMY_PATIENTS = [
-  {
-    name: "Sarah J. Mitchell",
-    dob: "03/14/1985",
-    mrn: "MRN-00291847",
-    source: "Epic",
-    payer: "UnitedHealthcare",
-    member_id: "UHC-884720193",
-    group_number: "GRP-44821",
-    plan_type: "PPO",
-  },
-  {
-    name: "Samuel J. Mitchell",
-    dob: "09/20/1978",
-    mrn: "MRN-00291901",
-    source: "Epic",
-    payer: "Cigna",
-    member_id: "CIG-338881234",
-    group_number: "GRP-77001",
-    plan_type: "HMO",
-  },
-  {
-    name: "James R. Holloway",
-    dob: "07/22/1971",
-    mrn: "MRN-00487223",
-    source: "Epic",
-    payer: "Aetna",
-    member_id: "AETNA-562901847",
-    group_number: "GRP-77334",
-    plan_type: "HMO",
-  },
-  {
-    name: "Linda K. Patel",
-    dob: "11/30/1990",
-    mrn: "MRN-00512948",
-    source: "Epic",
-    payer: "Blue Cross Blue Shield",
-    member_id: "BCBS-774930281",
-    group_number: "GRP-22019",
-    plan_type: "PPO",
-  },
-];
-
 const FOUND_FIELDS = ["Name", "DOB", "Member ID", "Payer", "Group Number", "Plan Type"];
 const MISSING_FIELDS = ["CPT Code", "Service Date", "Provider NPI"];
 
 function ConnectModal({ emr, onClose }) {
+  const [fhirVersion, setFhirVersion] = useState("R4");
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
@@ -93,11 +54,15 @@ function ConnectModal({ emr, onClose }) {
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
               FHIR Version
             </label>
-            <select className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none">
-              {["R4", "DSTU2", "STU3"].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
+            <AppSelect
+              value={fhirVersion}
+              onValueChange={setFhirVersion}
+              options={["R4", "DSTU2", "STU3"].map((version) => ({
+                label: version,
+                value: version,
+              }))}
+              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+            />
           </div>
         </div>
         <div className="flex gap-3 mt-5">
@@ -121,6 +86,7 @@ function ConnectModal({ emr, onClose }) {
 }
 
 export default function EmrTab({ onSubmit }) {
+  const { data: subscribers = [] } = useEntityListQuery("Subscriber", { limit: 100 }, null);
   const [selectedEhr, setSelectedEhr] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -138,7 +104,19 @@ export default function EmrTab({ onSubmit }) {
   };
 
   const filteredPatients = searchQuery.trim()
-    ? DUMMY_PATIENTS.filter(
+    ? subscribers
+        .map((subscriber) => ({
+          id: subscriber.id,
+          name: `${subscriber.firstName || ""} ${subscriber.lastName || ""}`.trim(),
+          dob: subscriber.dob,
+          mrn: subscriber.id,
+          source: selectedEhr?.name || "EMR",
+          payer: subscriber.payer,
+          member_id: subscriber.memberId,
+          group_number: subscriber.groupNumber,
+          plan_type: subscriber.planType,
+        }))
+        .filter(
         (p) =>
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.mrn.includes(searchQuery)
       )
@@ -269,7 +247,7 @@ export default function EmrTab({ onSubmit }) {
             <div className="mt-3 space-y-2">
               {filteredPatients.map((p) => (
                 <div
-                  key={p.mrn}
+                  key={p.id}
                   onClick={() => {
                     setSelectedPatient(p);
                     setShowForm(false);

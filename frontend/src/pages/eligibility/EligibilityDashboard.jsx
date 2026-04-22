@@ -1,4 +1,4 @@
-import { useAuthUserQuery } from "@/lib/query";
+import { useAuthUserQuery, useEntityListQuery } from "@/lib/query";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import {
   Wifi,
@@ -12,115 +12,118 @@ import {
   Activity,
   Clock,
 } from "lucide-react";
+const METHOD_CONFIG = {
+  Availity: { icon: Wifi, color: "#15803d", bg: "#f0fdf4" },
+  "Direct Payer API": { icon: Globe, color: "#1d4ed8", bg: "#eff6ff" },
+  "EMR Integration": { icon: Database, color: "#6d28d9", bg: "#f5f3ff" },
+  "Portal Automation": { icon: Monitor, color: "#b45309", bg: "#fffbeb" },
+  Unknown: { icon: Activity, color: "#64748b", bg: "#f8fafc" },
+};
 
-const METHOD_STATS = [
-  {
-    label: "Availity API",
-    icon: Wifi,
-    count: 31,
-    pct: 66,
-    avgMs: 2800,
-    color: "#15803d",
-    bg: "#f0fdf4",
-  },
-  {
-    label: "Direct Payer API",
-    icon: Globe,
-    count: 8,
-    pct: 17,
-    avgMs: 1600,
-    color: "#1d4ed8",
-    bg: "#eff6ff",
-  },
-  {
-    label: "EMR Integration",
-    icon: Database,
-    count: 5,
-    pct: 10,
-    avgMs: 900,
-    color: "#6d28d9",
-    bg: "#f5f3ff",
-  },
-  {
-    label: "Portal Automation",
-    icon: Monitor,
-    count: 3,
-    pct: 7,
-    avgMs: 11200,
-    color: "#b45309",
-    bg: "#fffbeb",
-  },
-];
-
-const TOP_METRICS = [
-  {
-    label: "Eligibility Checks Today",
-    value: 47,
-    trend: +12,
-    up: true,
-    icon: Activity,
-    color: "#0a7e87",
-    bg: "#f0fdfa",
-  },
-  {
-    label: "Avg Response Time",
-    value: "2.8s",
-    trend: -0.4,
-    up: true,
-    suffix: "s faster",
-    icon: Clock,
-    color: "#293682",
-    bg: "#eef3ff",
-  },
-  {
-    label: "Failed / Manual Follow-up",
-    value: 5,
-    trend: +2,
-    up: false,
-    icon: AlertTriangle,
-    color: "#dc2626",
-    bg: "#fef2f2",
-  },
-  {
-    label: "Converted to Prior Auth",
-    value: 18,
-    trend: +3,
-    up: true,
-    icon: ClipboardList,
-    color: "#f6b037",
-    bg: "#fffbeb",
-  },
-];
-
-const FAILED_CHECKS = [
-  {
-    id: "EL-03885",
-    patient: "Kevin B. Walsh",
-    payer: "Molina",
-    reason: "Payer timeout — portal login failed",
-    specialist: "Sam Torres",
-    time: "1 hr ago",
-  },
-  {
-    id: "EL-03881",
-    patient: "Tania M. Osei",
-    payer: "WellCare",
-    reason: "Member ID not found in payer system",
-    specialist: "Priya Mehta",
-    time: "2 hr ago",
-  },
-  {
-    id: "EL-03876",
-    patient: "Raj V. Kapoor",
-    payer: "Anthem",
-    reason: "Availity returned incomplete EB segments",
-    specialist: "Dana Kim",
-    time: "3 hr ago",
-  },
-];
+function isToday(value) {
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toDateString() === new Date().toDateString();
+}
 
 export default function EligibilityDashboard() {
   const { data: user } = useAuthUserQuery({ withDefaultRole: "staffingly_supervisor" });
+  const { data: history = [] } = useEntityListQuery("EligibilityHistory", { limit: 100 }, null);
+
+  const methodStats = Object.entries(
+    history.reduce((acc, record) => {
+      const method = record.channelUsed || "Unknown";
+      if (!acc[method]) {
+        acc[method] = { count: 0, responseTotal: 0 };
+      }
+      acc[method].count += 1;
+      acc[method].responseTotal += record.responseTimeSeconds ? record.responseTimeSeconds * 1000 : 0;
+      return acc;
+    }, {})
+  ).map(([label, stats]) => {
+    const config = METHOD_CONFIG[label] || METHOD_CONFIG.Unknown;
+    return {
+      label,
+      icon: config.icon,
+      count: stats.count,
+      pct: history.length ? Math.round((stats.count / history.length) * 100) : 0,
+      avgMs: stats.count ? Math.round(stats.responseTotal / stats.count) : 0,
+      color: config.color,
+      bg: config.bg,
+    };
+  });
+
+  const failedChecks = history
+    .filter((record) => record.requiresHumanReview || record.coverageStatus !== "Active")
+    .slice(0, 5)
+    .map((record) => {
+      let flags = [];
+      try {
+        flags = record.flagsJson ? JSON.parse(record.flagsJson) : [];
+      } catch {
+        flags = [];
+      }
+
+      return {
+        id: record.id,
+        patient: record.subscriberName || "Unknown patient",
+        payer: record.payer || "Unknown payer",
+        reason: flags[0] || "Manual follow-up required",
+        specialist: record.verifiedBy || "Unassigned",
+        time: record.createdAt ? new Date(record.createdAt).toLocaleString() : "—",
+      };
+    });
+
+  const avgResponse =
+    history.length > 0
+      ? (
+          history.reduce((sum, record) => sum + (record.responseTimeSeconds || 0), 0) / history.length
+        ).toFixed(1)
+      : "0.0";
+  const convertedToPriorAuth = history.filter((record) => {
+    try {
+      return Boolean(record.rawResponseJson ? JSON.parse(record.rawResponseJson)?.convertedToPa : false);
+    } catch {
+      return false;
+    }
+  }).length;
+  const topMetrics = [
+    {
+      label: "Eligibility Checks Today",
+      value: history.filter((record) => isToday(record.createdAt)).length,
+      trend: history.filter((record) => isToday(record.createdAt)).length,
+      up: true,
+      icon: Activity,
+      color: "#0a7e87",
+      bg: "#f0fdfa",
+    },
+    {
+      label: "Avg Response Time",
+      value: `${avgResponse}s`,
+      trend: Number(avgResponse),
+      up: true,
+      icon: Clock,
+      color: "#293682",
+      bg: "#eef3ff",
+    },
+    {
+      label: "Failed / Manual Follow-up",
+      value: failedChecks.length,
+      trend: failedChecks.length,
+      up: false,
+      icon: AlertTriangle,
+      color: "#dc2626",
+      bg: "#fef2f2",
+    },
+    {
+      label: "Converted to Prior Auth",
+      value: convertedToPriorAuth,
+      trend: convertedToPriorAuth,
+      up: true,
+      icon: ClipboardList,
+      color: "#f6b037",
+      bg: "#fffbeb",
+    },
+  ];
 
   return (
     <StaffinglyLayout
@@ -130,9 +133,20 @@ export default function EligibilityDashboard() {
       breadcrumbs={["Eligibility", "Dashboard"]}
     >
       <div className="space-y-6 max-w-[1400px] mx-auto">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Eligibility Enterprise Dashboard</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Monitor real-time verification performance, success rates, and connection methods.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Top Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {TOP_METRICS.map((m, i) => (
+          {topMetrics.map((m, i) => (
             <div
               key={i}
               className="bg-white rounded-2xl border border-slate-200 p-5 flex items-start gap-4"
@@ -167,7 +181,7 @@ export default function EligibilityDashboard() {
             </p>
           </div>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {METHOD_STATS.map((m, i) => {
+            {methodStats.map((m, i) => {
               const Icon = m.icon;
               return (
                 <div
@@ -207,7 +221,7 @@ export default function EligibilityDashboard() {
           <div className="px-6 pb-5">
             <p className="text-xs text-slate-500 mb-2">Combined usage today</p>
             <div className="h-3 rounded-full overflow-hidden flex">
-              {METHOD_STATS.map((m, i) => (
+              {methodStats.map((m, i) => (
                 <div
                   key={i}
                   className="h-full"
@@ -217,7 +231,7 @@ export default function EligibilityDashboard() {
               ))}
             </div>
             <div className="flex gap-4 mt-2 flex-wrap">
-              {METHOD_STATS.map((m, i) => (
+              {methodStats.map((m, i) => (
                 <span key={i} className="flex items-center gap-1 text-[11px] text-slate-500">
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
                   {m.label} ({m.pct}%)
@@ -237,11 +251,11 @@ export default function EligibilityDashboard() {
               </h3>
             </div>
             <span className="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-bold">
-              {FAILED_CHECKS.length} pending
+              {failedChecks.length} pending
             </span>
           </div>
           <div className="divide-y divide-slate-50">
-            {FAILED_CHECKS.map((fc, i) => (
+            {failedChecks.map((fc, i) => (
               <div key={i} className="flex items-start gap-4 px-6 py-4 hover:bg-slate-50/50">
                 <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />
                 <div className="flex-1 min-w-0">

@@ -1,25 +1,9 @@
 import { useState } from "react";
+import { useEntityListQuery } from "@/lib/query";
 import { motion } from "framer-motion";
 import { X, Upload } from "lucide-react";
 import AppSelect from "@/components/ui/app-select";
 import InsuranceCardCapture from "./InsuranceCardCapture";
-
-const PAYERS = [
-  "UnitedHealthcare",
-  "Aetna",
-  "Cigna",
-  "Humana",
-  "Blue Cross Blue Shield",
-  "Kaiser Permanente",
-  "Anthem",
-  "Medicare",
-  "Medicaid",
-  "Tricare",
-  "Molina Healthcare",
-  "Centene",
-  "Oscar Health",
-  "Other",
-];
 
 const PLAN_TYPES = [
   "PPO",
@@ -93,6 +77,7 @@ export default function InsurancePolicyForm({
   onClose,
   onSave,
 }) {
+  const { data: payerRules = [] } = useEntityListQuery("PayerRule", { limit: 100 }, null);
   const [form, setForm] = useState({
     policyType: policy?.policyType || "PRIMARY",
     payerName: policy?.payerName || "",
@@ -115,6 +100,11 @@ export default function InsurancePolicyForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showCardCapture, setShowCardCapture] = useState(false);
+  const payerOptions = [
+    ...new Set(
+      payerRules.map((rule) => rule.payerName).filter(Boolean).concat("Other")
+    ),
+  ];
 
   const updateField = (field) => (event) =>
     setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -271,7 +261,7 @@ export default function InsurancePolicyForm({
                   label="Insurance Payer *"
                   value={form.payerName}
                   onValueChange={(value) => setForm((current) => ({ ...current, payerName: value }))}
-                  options={PAYERS}
+                  options={payerOptions}
                   placeholder="Select payer..."
                 />
                 <TextField

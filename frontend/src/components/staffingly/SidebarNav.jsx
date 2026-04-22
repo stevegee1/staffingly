@@ -56,9 +56,7 @@ const COMMON_NAV = [
 ];
 
 const ROLE_EXTRA_NAV = {
-  staffingly_specialist: [
-    { label: "My Cases", icon: Briefcase, page: "specialist-case-view" },
-  ],
+  staffingly_specialist: [{ label: "My Cases", icon: Briefcase, page: "specialist-case-view" }],
   staffingly_supervisor: [
     { label: "Approval Queue", icon: ClipboardList, page: "supervisor-approval-queue" },
     { label: "Unmatched Docs", icon: AlertTriangle, page: "unmatched-documents" },
@@ -126,11 +124,11 @@ export default function SidebarNav({ user, currentPage }) {
 
   return (
     <aside
-      className="h-screen sticky top-0 flex flex-col border-r border-slate-200 bg-white flex-shrink-0 transition-all duration-300"
+      className="z-40 h-screen sticky top-0 flex flex-col border-r border-slate-200 bg-white flex-shrink-0 transition-all duration-300"
       style={{ width: collapsed ? 68 : 240 }}
     >
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-slate-100 flex items-center gap-2.5 min-h-[64px]">
+      <div className="sticky top-0 z-50 px-4 py-4 border-b border-slate-100 bg-white flex items-center gap-2.5 min-h-[64px]">
         <img
           src="/images/logo/staffverify-pictorial-logo.png"
           alt="StaffVerify Logo"
@@ -144,10 +142,14 @@ export default function SidebarNav({ user, currentPage }) {
         )}
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className={`w-6 h-6 rounded-lg flex items-center justify-center hover:bg-slate-100 flex-shrink-0 transition-colors ${collapsed ? "bg-slate-100" : ""}`}
+          className={
+            collapsed
+              ? "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors z-50"
+              : "w-6 h-6 rounded-lg flex items-center justify-center hover:bg-slate-100 flex-shrink-0 transition-colors"
+          }
         >
           {collapsed ? (
-            <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronRightIcon className="w-3.5 h-3.5" />
           ) : (
             <ChevronLeft className="w-3.5 h-3.5 text-slate-400" />
           )}

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Upload, FileImage, CheckCircle, Loader2, AlertTriangle, Camera } from "lucide-react";
 import { api } from "@/lib/api";
+import AppSelect from "@/components/ui/app-select";
 import ManualEntryTab from "./ManualEntryTab";
 
 const DOC_TYPES = [
@@ -144,15 +145,12 @@ export default function UploadTab({ onSubmit }) {
         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
           Document Type
         </label>
-        <select
+        <AppSelect
           value={docType}
-          onChange={(e) => setDocType(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none max-w-sm"
-        >
-          {DOC_TYPES.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
+          onValueChange={setDocType}
+          options={DOC_TYPES.map((type) => ({ label: type, value: type }))}
+          triggerClassName="max-w-sm h-[46px] bg-white px-3 py-2.5 text-sm"
+        />
       </div>
 
       {/* Upload Zone */}
@@ -286,12 +284,8 @@ export default function UploadTab({ onSubmit }) {
                         {confidence}%
                       </span>
                     )}
-                    {!lowConf && hasValue && (
-                      <CheckCircle className="w-3 h-3 text-emerald-500" />
-                    )}
-                    {lowConf && (
-                      <AlertTriangle className="w-3 h-3 text-amber-500" />
-                    )}
+                    {!lowConf && hasValue && <CheckCircle className="w-3 h-3 text-emerald-500" />}
+                    {lowConf && <AlertTriangle className="w-3 h-3 text-amber-500" />}
                   </label>
                   <input
                     value={editedData[key] || ""}

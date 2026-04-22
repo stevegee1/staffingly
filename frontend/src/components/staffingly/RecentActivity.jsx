@@ -1,3 +1,4 @@
+import { useEntityListQuery } from "@/lib/query";
 import { Activity } from "lucide-react";
 
 const STATUS_STYLE = {
@@ -9,78 +10,68 @@ const STATUS_STYLE = {
   "In Progress": { bg: "#f0fdfa", text: "#0f766e", dot: "#0d9488" },
 };
 
-const DUMMY_ACTIVITY = [
-  {
-    id: "PA-00412",
-    action: "Prior Auth Submitted",
-    client: "Sunrise Family Clinic",
-    time: "3 min ago",
-    status: "Submitted",
-  },
-  {
-    id: "EL-03891",
-    action: "Eligibility Verified",
-    client: "Lakeview Orthopedics",
-    time: "8 min ago",
-    status: "Approved",
-  },
-  {
-    id: "PA-00411",
-    action: "PA Approved by Aetna",
-    client: "Metro Mental Health",
-    time: "22 min ago",
-    status: "Approved",
-  },
-  {
-    id: "EL-03888",
-    action: "Coverage Flagged",
-    client: "Sunrise Family Clinic",
-    time: "34 min ago",
-    status: "Flagged",
-  },
-  {
-    id: "PA-00409",
-    action: "PA Denied by UHC",
-    client: "Lakeview Orthopedics",
-    time: "1 hr ago",
-    status: "Denied",
-  },
-  {
-    id: "EL-03882",
-    action: "Eligibility Checked",
-    client: "Metro Mental Health",
-    time: "1 hr ago",
-    status: "Approved",
-  },
-  {
-    id: "PA-00408",
-    action: "Prior Auth In Review",
-    client: "Sunrise Family Clinic",
-    time: "2 hr ago",
-    status: "In Progress",
-  },
-  {
-    id: "EL-03875",
-    action: "Eligibility Checked",
-    client: "Lakeview Orthopedics",
-    time: "3 hr ago",
-    status: "Approved",
-  },
-  {
-    id: "PA-00405",
-    action: "Additional Info Requested",
-    client: "Metro Mental Health",
-    time: "4 hr ago",
-    status: "Pending",
-  },
-  {
-    id: "EL-03860",
-    action: "Coverage Inactive",
-    client: "Sunrise Family Clinic",
-    time: "5 hr ago",
-    status: "Denied",
-  },
-];
+function getRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
+function buildEligibilityActivity(record, clientName) {
+  let action = "Eligibility Checked";
+  let status = "Approved";
+
+  if (record.requiresHumanReview || record.coverageStatus === "Unknown") {
+    action = "Coverage Flagged";
+    status = "Flagged";
+  } else if (record.coverageStatus === "Inactive") {
+    action = "Coverage Inactive";
+    status = "Denied";
+  } else if (record.coverageStatus === "Active") {
+    action = "Eligibility Verified";
+    status = "Approved";
+  }
+
+  return {
+    id: record.id,
+    action,
+    client: clientName,
+    time: getRelativeTime(record.createdAt),
+    status,
+    sortDate: record.createdAt,
+  };
+}
+
+function buildPriorAuthActivity(record) {
+  const statusMap = {
+    SUBMITTED: { action: "Prior Auth Submitted", status: "Submitted" },
+    APPROVED: { action: `PA Approved by ${record.payerName || "payer"}`, status: "Approved" },
+    DENIED: { action: `PA Denied by ${record.payerName || "payer"}`, status: "Denied" },
+    PENDING_DOCUMENTS: { action: "Additional Info Requested", status: "Pending" },
+    READY_FOR_SUBMISSION: { action: "Prior Auth Ready", status: "Pending" },
+    INTAKE: { action: "Prior Auth In Review", status: "In Progress" },
+  };
+
+  const derived = statusMap[record.status] || { action: "Prior Auth Updated", status: "In Progress" };
+
+  return {
+    id: record.caseNumber || record.id,
+    action: derived.action,
+    client: record.client?.name || "—",
+    time: getRelativeTime(record.createdAt),
+    status: derived.status,
+    sortDate: record.createdAt,
+  };
+}
 
 function SkeletonRow() {
   return (
@@ -95,6 +86,33 @@ function SkeletonRow() {
 }
 
 export default function RecentActivity({ loading = false }) {
+  const { data: history = [], isLoading: loadingHistory } = useEntityListQuery(
+    "EligibilityHistory",
+    { limit: 20 },
+    null
+  );
+  const { data: priorAuthCases = [], isLoading: loadingCases } = useEntityListQuery(
+    "PriorAuthCase",
+    { page: 1, limit: 20 },
+    null
+  );
+  const { data: clients = [] } = useEntityListQuery("Client", { limit: 100 }, null);
+
+  const clientNames = Object.fromEntries(
+    clients.map((client) => [client.id, client.practiceName || client.name || client.id])
+  );
+
+  const activities = [
+    ...history.map((record) =>
+      buildEligibilityActivity(record, clientNames[record.clientId] || record.clientId || "—")
+    ),
+    ...priorAuthCases.map((record) => buildPriorAuthActivity(record)),
+  ]
+    .sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime())
+    .slice(0, 10);
+
+  const isLoading = loading || loadingHistory || loadingCases;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -105,13 +123,13 @@ export default function RecentActivity({ loading = false }) {
         <span className="text-xs text-slate-400">Last 10 actions</span>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div>
           {[...Array(5)].map((_, i) => (
             <SkeletonRow key={i} />
           ))}
         </div>
-      ) : DUMMY_ACTIVITY.length === 0 ? (
+      ) : activities.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
@@ -147,10 +165,10 @@ export default function RecentActivity({ loading = false }) {
               </tr>
             </thead>
             <tbody>
-              {DUMMY_ACTIVITY.map((row, i) => {
+              {activities.map((row) => {
                 const st = STATUS_STYLE[row.status] || STATUS_STYLE.Pending;
                 return (
-                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-5 py-3 font-mono font-semibold text-slate-700">{row.id}</td>
                     <td className="px-5 py-3 text-slate-700">{row.action}</td>
                     <td className="px-5 py-3 text-slate-500">{row.client}</td>

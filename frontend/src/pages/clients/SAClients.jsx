@@ -162,32 +162,44 @@ export default function SAClients() {
       </AnimatePresence>
 
       <div className="mx-auto flex min-h-[calc(100vh-230px)] max-w-[1400px] flex-col space-y-5">
-        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center">
-          <div className="flex flex-1 flex-wrap gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by client name, practice, or email..."
-                className="w-72 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none"
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Client Registry</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Manage all registered clients, their branding, and active configurations.
+              </p>
+            </div>
+            <button
+              onClick={handleCreateClient}
+              className="flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white"
+              style={{ backgroundColor: "#0a7e87" }}
+            >
+              <Plus className="h-4 w-4" /> Onboard Client
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
+            <div className="flex flex-1 flex-wrap gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by client name, practice, or email..."
+                  className="w-full sm:w-72 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#0a7e87]"
+                />
+              </div>
+              <AppSelect
+                value={filterStatus}
+                onValueChange={setFilterStatus}
+                options={STATUS_OPTIONS}
+                triggerClassName="h-9 w-[170px] rounded-xl px-3 py-2 text-xs focus:ring-0"
               />
             </div>
-            <AppSelect
-              value={filterStatus}
-              onValueChange={setFilterStatus}
-              options={STATUS_OPTIONS}
-              triggerClassName="h-9 w-[170px] rounded-xl px-3 py-2 text-xs focus:ring-0"
-            />
           </div>
-
-          <button
-            onClick={handleCreateClient}
-            className="flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-bold text-white"
-            style={{ backgroundColor: "#0a7e87" }}
-          >
-            <Plus className="h-4 w-4" /> Onboard Client
-          </button>
         </div>
 
         <div

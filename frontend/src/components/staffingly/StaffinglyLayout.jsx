@@ -20,15 +20,13 @@ export default function StaffinglyLayout({
 
   return (
     <div
-      className="flex h-screen min-h-screen overflow-hidden"
+      className="flex min-h-screen"
       style={{ backgroundColor: "#eef3ff", fontFamily: "'DM Sans', sans-serif" }}
     >
       <SidebarNav user={resolvedUser} currentPage={currentPage} />
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-auto">
-          <TopBar user={resolvedUser} title={title} breadcrumbs={breadcrumbs} />
-          <main className="p-5">{children}</main>
-        </div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar user={resolvedUser} title={title} breadcrumbs={breadcrumbs} />
+        <main className="p-5 flex-1">{children}</main>
       </div>
       {showChatbot && resolvedUser && (
         <AIChatbot

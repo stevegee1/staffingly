@@ -1,27 +1,142 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys, useAuthUserQuery, useEntityListQuery } from "@/lib/query";
+import { createPageUrl } from "@/lib/utils/page";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import PatientForm from "@/components/patients/PatientForm";
 import InsurancePolicyForm from "@/components/patients/InsurancePolicyForm";
 import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  CreditCard,
+  Edit2,
+  FileWarning,
   Plus,
   Search,
-  User,
-  CreditCard,
-  ChevronRight,
-  ChevronDown,
-  Edit2,
+  ShieldCheck,
+  ShieldX,
   Trash2,
-  AlertCircle,
+  User,
+  UserRoundCheck,
 } from "lucide-react";
 
 const COVERAGE_COLORS = {
-  ACTIVE: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
-  INACTIVE: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
-  UNKNOWN: { bg: "#f8fafc", text: "#64748b", border: "#e2e8f0" },
+  ACTIVE: { label: "Active", bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
+  INACTIVE: { label: "Inactive", bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
+  UNKNOWN: {
+    label: "Unverified",
+    bg: "#f8fafc",
+    text: "#64748b",
+    border: "#e2e8f0",
+    tooltip: "This policy has not been verified against the payer database yet.",
+  },
 };
+
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "ready", label: "Ready" },
+  { key: "attention", label: "Needs Attention" },
+  { key: "missing-insurance", label: "Missing Insurance" },
+];
+
+const STAT_CARDS = [
+  {
+    key: "total",
+    label: "Total Patients",
+    detail: "Patients currently visible in this workspace.",
+    tone: "blue",
+    icon: UserRoundCheck,
+  },
+  {
+    key: "ready",
+    label: "Ready to Verify",
+    detail: "Primary insurance is on file and ready for an eligibility run.",
+    tone: "teal",
+    icon: ShieldCheck,
+  },
+  {
+    key: "attention",
+    label: "Needs Attention",
+    detail: "Missing primary policy details or verification still needs to happen.",
+    tone: "amber",
+    icon: FileWarning,
+  },
+  {
+    key: "missing-insurance",
+    label: "Missing Insurance",
+    detail: "Patients blocked from verification until coverage is added.",
+    tone: "rose",
+    icon: ShieldX,
+  },
+];
+
+function getPrimaryPolicy(patient) {
+  return patient.insurancePolicies?.find((policy) => policy.policyType === "PRIMARY");
+}
+
+function getPatientWorkflowState(patient) {
+  const primaryPolicy = getPrimaryPolicy(patient);
+  const hasInsurance = (patient.insurancePolicies?.length || 0) > 0;
+
+  if (!hasInsurance) {
+    return {
+      key: "missing-insurance",
+      label: "Missing insurance",
+      detail: "Add insurance before verifying.",
+      tone: { bg: "#fff7ed", text: "#c2410c", border: "#fdba74" },
+    };
+  }
+
+  if (!primaryPolicy?.payerName || !primaryPolicy?.memberId) {
+    return {
+      key: "attention",
+      label: "Needs attention",
+      detail: "Complete primary policy details.",
+      tone: { bg: "#fefce8", text: "#a16207", border: "#fde68a" },
+    };
+  }
+
+  if ((primaryPolicy.lastCoverageStatus || "UNKNOWN") === "UNKNOWN") {
+    return {
+      key: "attention",
+      label: "Needs verification",
+      detail: "Coverage has not been confirmed yet.",
+      tone: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+    };
+  }
+
+  return {
+    key: "ready",
+    label: "Ready",
+    detail: "Primary policy is ready for verification.",
+    tone: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
+  };
+}
+
+function buildVerificationParams(patient) {
+  const primaryPolicy = getPrimaryPolicy(patient);
+
+  return new URLSearchParams({
+    source: "patients",
+    patientId: patient.id,
+    first_name: patient.firstName || "",
+    last_name: patient.lastName || "",
+    dob: patient.dob ? patient.dob.split("T")[0] : "",
+    phone: patient.phone || "",
+    email: patient.email || "",
+    payer: primaryPolicy?.payerName || "",
+    member_id: primaryPolicy?.memberId || "",
+    group_number: primaryPolicy?.groupNumber || "",
+    plan_name: primaryPolicy?.planName || "",
+    plan_type: primaryPolicy?.planType || "",
+    subscriber_name: primaryPolicy?.subscriberName || "",
+    subscriber_dob: primaryPolicy?.subscriberDob ? primaryPolicy.subscriberDob.split("T")[0] : "",
+    subscriber_relationship: primaryPolicy?.subscriberRelationship || "Self",
+  }).toString();
+}
 
 function PolicyBadge({ policy }) {
   const typeColors = {
@@ -33,7 +148,7 @@ function PolicyBadge({ policy }) {
 
   return (
     <span
-      className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+      className="rounded-full px-2 py-0.5 text-[10px] font-bold"
       style={{ backgroundColor: color.bg, color: color.text }}
     >
       {policy.policyType}
@@ -41,236 +156,279 @@ function PolicyBadge({ policy }) {
   );
 }
 
-function PatientRow({ patient, onEdit, onDelete, onAddInsurance, onEditInsurance }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const primaryPolicy = patient.insurancePolicies?.find((p) => p.policyType === "PRIMARY");
-  const coverageStatus = primaryPolicy?.lastCoverageStatus || "UNKNOWN";
-  const cc = COVERAGE_COLORS[coverageStatus] || COVERAGE_COLORS.UNKNOWN;
+function StatCard({ icon: Icon, label, value, detail, tone = "slate" }) {
+  const tones = {
+    blue: { shell: "#eff6ff", icon: "#2563eb" },
+    teal: { shell: "#ecfeff", icon: "#0f766e" },
+    amber: { shell: "#fffbeb", icon: "#d97706" },
+    rose: { shell: "#fff1f2", icon: "#e11d48" },
+    slate: { shell: "#f8fafc", icon: "#475569" },
+  };
+  const colors = tones[tone] || tones.slate;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {/* Main Row */}
-      <div
-        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50/50"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-          <User className="w-5 h-5 text-slate-400" />
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-3 text-3xl font-bold text-slate-800">{value}</p>
+          <p className="mt-2 text-sm text-slate-500">{detail}</p>
         </div>
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-full flex-shrink-0"
+          style={{ backgroundColor: colors.shell }}
+        >
+          <Icon className="h-5 w-5" style={{ color: colors.icon }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Patient Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-800 text-sm">
-              {patient.firstName} {patient.middleName ? `${patient.middleName.charAt(0)}. ` : ""}{patient.lastName}
-            </span>
-            {primaryPolicy && (
-              <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                style={{ backgroundColor: cc.bg, color: cc.text, border: `1px solid ${cc.border}` }}
-              >
-                {coverageStatus}
+function PatientRow({ patient, onEdit, onDelete, onAddInsurance, onEditInsurance, onVerify }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const primaryPolicy = getPrimaryPolicy(patient);
+  const coverageStatus = primaryPolicy?.lastCoverageStatus || "UNKNOWN";
+  const coverageColors = COVERAGE_COLORS[coverageStatus] || COVERAGE_COLORS.UNKNOWN;
+  const workflowState = getPatientWorkflowState(patient);
+  const canVerify = Boolean(primaryPolicy?.payerName && primaryPolicy?.memberId);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="flex flex-1 items-start gap-4 text-left"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 flex-shrink-0">
+            <User className="h-5 w-5 text-slate-400" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-900">
+                {patient.firstName} {patient.middleName ? `${patient.middleName.charAt(0)}. ` : ""}
+                {patient.lastName}
               </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
-            <span>DOB: {new Date(patient.dob).toLocaleDateString()}</span>
-            {patient.phone && <span>{patient.phone}</span>}
-            {primaryPolicy && (
-              <>
-                <span className="text-slate-300">|</span>
-                <span>{primaryPolicy.payerName}</span>
-                <span className="text-slate-300">|</span>
+              <span
+                className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                style={{
+                  backgroundColor: workflowState.tone.bg,
+                  color: workflowState.tone.text,
+                  border: `1px solid ${workflowState.tone.border}`,
+                }}
+              >
+                {workflowState.label}
+              </span>
+              {primaryPolicy && coverageStatus !== "UNKNOWN" ? (
+                <span
+                  title={coverageColors.tooltip || ""}
+                  className="rounded-full px-2.5 py-1 text-[10px] font-bold cursor-help"
+                  style={{
+                    backgroundColor: coverageColors.bg,
+                    color: coverageColors.text,
+                    border: `1px solid ${coverageColors.border}`,
+                  }}
+                >
+                  {coverageColors.label || coverageStatus}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              <span>DOB: {new Date(patient.dob).toLocaleDateString()}</span>
+              {primaryPolicy?.payerName ? <span>{primaryPolicy.payerName}</span> : null}
+              {primaryPolicy?.memberId ? (
                 <span className="font-mono">{primaryPolicy.memberId}</span>
-              </>
-            )}
+              ) : null}
+            </div>
+
+            <p className="mt-2 text-sm text-slate-500">{workflowState.detail}</p>
           </div>
-        </div>
+        </button>
 
-        {/* Insurance Count */}
-        <div className="flex items-center gap-2 text-slate-400">
-          <CreditCard className="w-4 h-4" />
-          <span className="text-xs font-semibold">{patient.insurancePolicies?.length || 0}</span>
-        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+            <CreditCard className="h-4 w-4" />
+            {patient.insurancePolicies?.length || 0}
+          </div>
 
-        {/* Expand Icon */}
-        {expanded ? (
-          <ChevronDown className="w-5 h-5 text-slate-400" />
-        ) : (
-          <ChevronRight className="w-5 h-5 text-slate-400" />
-        )}
+          <button
+            type="button"
+            onClick={() => onAddInsurance(patient)}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Add Insurance
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onVerify(patient)}
+            disabled={!canVerify}
+            className="rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: "#293682" }}
+          >
+            Verify
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50"
+          >
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
-      {/* Expanded Content */}
-      {expanded && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
-          {/* Patient Actions */}
-          <div className="flex items-center gap-2 mb-4">
+      {expanded ? (
+        <div className="border-t border-slate-100 bg-slate-50/70 p-4">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(patient);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              type="button"
+              onClick={() => onEdit(patient)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
-              <Edit2 className="w-3.5 h-3.5" />
+              <Edit2 className="h-3.5 w-3.5" />
               Edit Patient
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddInsurance(patient);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold"
-              style={{ backgroundColor: "#0a7e87" }}
+              type="button"
+              onClick={() => onDelete(patient)}
+              className="ml-auto flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Add Insurance
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(patient);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-semibold text-red-600 hover:bg-red-100 ml-auto"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
               Delete
             </button>
           </div>
 
-          {/* Insurance Policies */}
           {patient.insurancePolicies?.length > 0 ? (
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Insurance Policies
-              </h4>
               {patient.insurancePolicies.map((policy) => {
-                const pcc = COVERAGE_COLORS[policy.lastCoverageStatus] || COVERAGE_COLORS.UNKNOWN;
+                const policyColors =
+                  COVERAGE_COLORS[policy.lastCoverageStatus] || COVERAGE_COLORS.UNKNOWN;
+
                 return (
                   <div
                     key={policy.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200"
+                    className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 lg:flex-row lg:items-center"
                   >
-                    <PolicyBadge policy={policy} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700">
-                        {policy.payerName}
-                        {policy.planName && (
-                          <span className="font-normal text-slate-500"> - {policy.planName}</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Member ID: <span className="font-mono">{policy.memberId}</span>
-                        {policy.groupNumber && (
-                          <>
-                            {" | "}Group: <span className="font-mono">{policy.groupNumber}</span>
-                          </>
-                        )}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <PolicyBadge policy={policy} />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">
+                          {policy.payerName}
+                          {policy.planName ? (
+                            <span className="font-normal text-slate-500"> - {policy.planName}</span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Member ID:{" "}
+                          <span className="font-mono">{policy.memberId || "Missing"}</span>
+                        </p>
+                      </div>
                     </div>
-                    {policy.lastCoverageStatus && (
-                      <span
-                        className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                        style={{
-                          backgroundColor: pcc.bg,
-                          color: pcc.text,
-                          border: `1px solid ${pcc.border}`,
-                        }}
+
+                    <div className="ml-auto flex items-center gap-2">
+                      {policy.lastCoverageStatus ? (
+                        <span
+                          title={policyColors.tooltip || ""}
+                          className="rounded-full px-2 py-0.5 text-[10px] font-bold cursor-help"
+                          style={{
+                            backgroundColor: policyColors.bg,
+                            color: policyColors.text,
+                            border: `1px solid ${policyColors.border}`,
+                          }}
+                        >
+                          {policyColors.label || policy.lastCoverageStatus}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onEditInsurance(patient, policy)}
+                        className="rounded-lg p-1.5 hover:bg-slate-100"
                       >
-                        {policy.lastCoverageStatus}
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditInsurance(patient, policy);
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-slate-100"
-                    >
-                      <Edit2 className="w-4 h-4 text-slate-400" />
-                    </button>
+                        <Edit2 className="h-4 w-4 text-slate-400" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-amber-50 border border-amber-200">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-amber-500" />
               <p className="text-sm text-amber-700">
-                No insurance on file. Add insurance to verify eligibility.
+                No insurance on file. Add insurance before verifying this patient.
               </p>
             </div>
           )}
-
-          {/* Contact Info */}
-          {(patient.email || patient.address) && (
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Contact Information
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
-                {patient.email && (
-                  <p>
-                    <span className="text-slate-400">Email:</span> {patient.email}
-                  </p>
-                )}
-                {patient.phone && (
-                  <p>
-                    <span className="text-slate-400">Phone:</span> {patient.phone}
-                  </p>
-                )}
-                {patient.address && (
-                  <p className="col-span-2">
-                    <span className="text-slate-400">Address:</span> {patient.address}
-                    {patient.city && `, ${patient.city}`}
-                    {patient.state && `, ${patient.state}`}
-                    {patient.zip && ` ${patient.zip}`}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
 export default function Patients() {
   const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
-
-  // Modal states
-  const [patientModal, setPatientModal] = useState(null); // null | "add" | patient object
-  const [insuranceModal, setInsuranceModal] = useState(null); // null | { patient, policy? }
+  const [patientModal, setPatientModal] = useState(null);
+  const [insuranceModal, setInsuranceModal] = useState(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: user } = useAuthUserQuery();
   const clientId = user?.clientId || "";
 
-  const {
-    data: clients = [],
-    isLoading: loadingClients,
-  } = useEntityListQuery("Client", { limit: 100 }, null, {
-    enabled: Boolean(user) && !user?.clientId,
-  });
+  const { data: clients = [], isLoading: loadingClients } = useEntityListQuery(
+    "Client",
+    { limit: 100 },
+    null,
+    {
+      enabled: Boolean(user) && !user?.clientId,
+    }
+  );
 
   const patientsParams = {
     page: pagination.page,
     limit: pagination.limit,
     ...(search ? { search } : {}),
   };
+
   const patientsQuery = useQuery({
     queryKey: queryKeys.patients.list(patientsParams),
     queryFn: () => api.patients.list(patientsParams),
     enabled: Boolean(user),
   });
+
   const patients = patientsQuery.data?.data || [];
   const loading = patientsQuery.isLoading;
   const totalPatients = patientsQuery.data?.pagination?.total || 0;
+
+  const patientStats = useMemo(() => {
+    return patients.reduce(
+      (stats, patient) => {
+        const state = getPatientWorkflowState(patient);
+        stats.total += 1;
+        stats[state.key] += 1;
+        return stats;
+      },
+      { total: 0, ready: 0, attention: 0, "missing-insurance": 0 }
+    );
+  }, [patients]);
+
+  const filteredPatients = useMemo(() => {
+    if (activeFilter === "all") {
+      return patients;
+    }
+
+    return patients.filter((patient) => getPatientWorkflowState(patient).key === activeFilter);
+  }, [activeFilter, patients]);
 
   const savePatientMutation = useMutation({
     mutationFn: (data) =>
@@ -317,6 +475,23 @@ export default function Patients() {
     await saveInsuranceMutation.mutateAsync(data);
   };
 
+  const handleVerifyPatient = (patient) => {
+    navigate(createPageUrl(`NewVerification?${buildVerificationParams(patient)}`));
+  };
+
+  useEffect(() => {
+    const hasOpenForm = patientModal !== null || insuranceModal !== null;
+    const previousOverflow = document.body.style.overflow;
+
+    if (hasOpenForm) {
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [patientModal, insuranceModal]);
+
   const patientFormClientOptions = clientId ? [] : clients;
   const requireClientSelection = !clientId;
 
@@ -327,102 +502,145 @@ export default function Patients() {
       title="Patients"
       breadcrumbs={["Patients", "Manage"]}
     >
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Patient Management</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Register patients and manage their insurance information
-            </p>
-            {!clientId && (
-              <p className="text-xs text-slate-400 mt-1">
-                {loadingClients
-                  ? "Loading clients for patient assignment..."
-                  : "Select a client when creating a patient."}
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Patients</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Manage patient records and launch verification when details are ready.
               </p>
-            )}
+              {!clientId ? (
+                <p className="mt-2 text-xs text-slate-400">
+                  {loadingClients
+                    ? "Loading clients for patient assignment..."
+                    : "Select a client when creating a patient."}
+                </p>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPatientModal("add")}
+              className="flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white"
+              style={{ backgroundColor: "#293682" }}
+            >
+              <Plus className="h-4 w-4" />
+              New Patient
+            </button>
           </div>
-          <button
-            onClick={() => setPatientModal("add")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm"
-            style={{ backgroundColor: "#293682" }}
-          >
-            <Plus className="w-4 h-4" />
-            New Patient
-          </button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search patients by name, email, or phone..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPagination((prev) => ({ ...prev, page: 1 }));
-            }}
-            className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#293682]"
-          />
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search patients by name, email, or phone..."
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPagination((current) => ({ ...current, page: 1 }));
+                }}
+                className="w-full sm:w-72 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#293682]"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setActiveFilter(filter.key)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                    activeFilter === filter.key
+                      ? "text-white shadow-sm"
+                      : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                  }`}
+                  style={activeFilter === filter.key ? { backgroundColor: "#293682" } : {}}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Patient List */}
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {STAT_CARDS.map((stat) => (
+            <StatCard
+              key={stat.key}
+              icon={stat.icon}
+              label={stat.label}
+              value={patientStats[stat.key]}
+              detail={stat.detail}
+              tone={stat.tone}
+            />
+          ))}
+        </div>
+
         {loading ? (
-          <div className="text-center py-12 text-slate-400">Loading patients...</div>
-        ) : patients.length === 0 ? (
-          <div className="text-center py-12">
-            <User className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <div className="py-12 text-center text-slate-400">Loading patients...</div>
+        ) : filteredPatients.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center shadow-sm">
+            <User className="mx-auto mb-3 h-12 w-12 text-slate-300" />
             <p className="text-slate-500">No patients found</p>
-            <p className="text-sm text-slate-400 mt-1">
-              {search ? "Try a different search term" : "Add your first patient to get started"}
+            <p className="mt-1 text-sm text-slate-400">
+              {search
+                ? "Try a different search or filter."
+                : "Add your first patient to get started."}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {patients.map((patient) => (
+            {filteredPatients.map((patient) => (
               <PatientRow
                 key={patient.id}
                 patient={patient}
                 onEdit={setPatientModal}
                 onDelete={handleDeletePatient}
-                onAddInsurance={(p) => setInsuranceModal({ patient: p })}
-                onEditInsurance={(p, policy) => setInsuranceModal({ patient: p, policy })}
+                onAddInsurance={(selectedPatient) =>
+                  setInsuranceModal({ patient: selectedPatient })
+                }
+                onEditInsurance={(selectedPatient, policy) =>
+                  setInsuranceModal({ patient: selectedPatient, policy })
+                }
+                onVerify={handleVerifyPatient}
               />
             ))}
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPatients > pagination.limit && (
-          <div className="flex items-center justify-between pt-4">
+        {totalPatients > pagination.limit ? (
+          <div className="flex items-center justify-between pt-2">
             <p className="text-sm text-slate-500">
               Showing {(pagination.page - 1) * pagination.limit + 1} -{" "}
               {Math.min(pagination.page * pagination.limit, totalPatients)} of {totalPatients}
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                type="button"
+                onClick={() => setPagination((current) => ({ ...current, page: current.page - 1 }))}
                 disabled={pagination.page === 1}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 disabled:opacity-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50"
               >
                 Previous
               </button>
               <button
-                onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                type="button"
+                onClick={() => setPagination((current) => ({ ...current, page: current.page + 1 }))}
                 disabled={pagination.page * pagination.limit >= totalPatients}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 disabled:opacity-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50"
               >
                 Next
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* Patient Modal */}
-      {patientModal && (
+      {patientModal ? (
         <PatientForm
           patient={patientModal === "add" ? null : patientModal}
           clientId={clientId}
@@ -432,10 +650,9 @@ export default function Patients() {
           onClose={() => setPatientModal(null)}
           onSave={handleSavePatient}
         />
-      )}
+      ) : null}
 
-      {/* Insurance Modal */}
-      {insuranceModal && (
+      {insuranceModal ? (
         <InsurancePolicyForm
           policy={insuranceModal.policy}
           patientId={insuranceModal.patient.id}
@@ -443,7 +660,7 @@ export default function Patients() {
           onClose={() => setInsuranceModal(null)}
           onSave={handleSaveInsurance}
         />
-      )}
+      ) : null}
     </StaffinglyLayout>
   );
 }
