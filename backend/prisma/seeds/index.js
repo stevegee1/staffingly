@@ -15,6 +15,11 @@ import { seedClients } from "./clients.js";
 import { seedPayerRules } from "./payerRules.js";
 import { seedStaff } from "./staff.js";
 import { seedPatients } from "./patients.js";
+import { seedEligibilityHistory } from "./eligibilityHistory.js";
+import { seedSubscribers } from "./subscribers.js";
+import { seedPriorAuthCases } from "./priorAuthCases.js";
+import { seedStaffinglyAuditLogs } from "./staffinglyAuditLogs.js";
+import { seedInvoices } from "./invoices.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -25,11 +30,16 @@ async function main() {
   console.log("🌱 Seeding database...");
 
   const { proPackage } = await seedPricingPackages(prisma);
-  await seedUsers(prisma);
   await seedClients(prisma, { proPackage });
+  await seedUsers(prisma);
   await seedPayerRules(prisma);
   await seedStaff(prisma);
   await seedPatients(prisma);
+  await seedSubscribers(prisma);
+  await seedEligibilityHistory(prisma);
+  await seedPriorAuthCases(prisma);
+  await seedStaffinglyAuditLogs(prisma);
+  await seedInvoices(prisma);
 
   console.log("🎉 Seeding complete!");
 }

@@ -88,16 +88,5 @@ export async function seedClients(prisma, { proPackage }) {
     },
   });
 
-  await prisma.user.upsert({
-    where: { email: "user@demopractice.com" },
-    update: {},
-    create: {
-      email: "user@demopractice.com",
-      name: "Demo User",
-      role: "CLIENT_USER",
-      clientId: "client-demo",
-    },
-  });
-
   console.log("✅ Created seeded clients, including demo client with billing and storage config");
 }

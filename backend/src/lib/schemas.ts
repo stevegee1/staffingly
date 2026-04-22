@@ -225,6 +225,8 @@ export const createUserSchema = Joi.object({
     )
     .required(),
   clientId: Joi.string().allow("", null),
+  active: Joi.boolean().default(true),
+  accountLocked: Joi.boolean().default(false),
 });
 
 export const updateUserSchema = Joi.object({
@@ -239,6 +241,8 @@ export const updateUserSchema = Joi.object({
     "CLIENT_USER"
   ),
   clientId: Joi.string().allow("", null),
+  active: Joi.boolean(),
+  accountLocked: Joi.boolean(),
 });
 
 export const createPayerRuleSchema = Joi.object({

@@ -11,10 +11,6 @@ router.post("/register", validateBody(registerSchema), asyncHandler(authControll
 
 router.post("/login", validateBody(loginSchema), asyncHandler(authController.login));
 
-// Google OAuth routes
-router.get("/google", asyncHandler(authController.googleAuth));
-router.get("/google/callback", asyncHandler(authController.googleCallback));
-
 router.get("/me", authenticate, asyncHandler(authController.me));
 
 router.post("/logout", authenticate, asyncHandler(authController.logout));

@@ -59,7 +59,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
 };
 
 export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { email, name, role, clientId } = req.body;
+  const { email, name, role, clientId, active, accountLocked } = req.body;
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -79,6 +79,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
       name,
       role,
       clientId,
+      ...(active !== undefined && { active }),
+      ...(accountLocked !== undefined && { accountLocked }),
     },
     include: {
       client: true,
@@ -93,7 +95,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
 
 export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
-  const { email, name, role, clientId } = req.body;
+  const { email, name, role, clientId, active, accountLocked } = req.body;
 
   const user = await prisma.user.update({
     where: { id },
@@ -102,6 +104,8 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
       name,
       role,
       clientId,
+      ...(active !== undefined && { active }),
+      ...(accountLocked !== undefined && { accountLocked }),
     },
     include: {
       client: true,

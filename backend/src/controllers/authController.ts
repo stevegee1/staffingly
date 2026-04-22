@@ -3,7 +3,6 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import prisma from "../lib/prisma.js";
-import { getGoogleAuthUrl, authenticateWithGoogleCode } from "../services/googleAuthService.js";
 import { sendPasswordResetEmail } from "../services/emailService.js";
 import type {
   AuthenticatedRequest,
@@ -145,11 +144,11 @@ export const login = async (
     return;
   }
 
-  // Verify password - if no passwordHash, user signed up with Google
+  // Users without passwords cannot sign in through the UI.
   if (!user.passwordHash) {
     res.status(401).json({
       success: false,
-      message: "This account uses Google sign-in. Please click 'Continue with Google' to sign in.",
+      message: "Password sign-in is not available for this account. Contact an administrator.",
     });
     return;
   }
@@ -239,98 +238,6 @@ export const logout = async (
     success: true,
     message: "Logged out successfully",
   });
-};
-
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3010";
-
-export const googleAuth = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const returnUrl = (req.query.returnUrl as string) || "/";
-
-  // Encode the return URL in state to redirect after auth
-  const state = Buffer.from(JSON.stringify({ returnUrl })).toString("base64");
-
-  const authUrl = getGoogleAuthUrl(state);
-  res.redirect(authUrl);
-};
-
-export const googleCallback = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { code, state, error } = req.query;
-
-  // Parse state to get return URL
-  let returnUrl = "/";
-  if (state && typeof state === "string") {
-    try {
-      const stateData = JSON.parse(Buffer.from(state, "base64").toString());
-      returnUrl = stateData.returnUrl || "/";
-    } catch {
-      // Invalid state, use default
-    }
-  }
-
-  // Handle OAuth errors
-  if (error) {
-    const errorMessage = encodeURIComponent(
-      "Google sign-in was cancelled. Please try again or sign in with your email."
-    );
-    res.redirect(`${FRONTEND_URL}/login?error=${errorMessage}`);
-    return;
-  }
-
-  if (!code || typeof code !== "string") {
-    const errorMessage = encodeURIComponent("Unable to complete Google sign-in. Please try again.");
-    res.redirect(`${FRONTEND_URL}/login?error=${errorMessage}`);
-    return;
-  }
-
-  try {
-    const { user } = await authenticateWithGoogleCode(code);
-
-    // Fetch user with client relation
-    const userWithClient = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
-      },
-    });
-
-    if (!userWithClient) {
-      const errorMessage = encodeURIComponent(
-        "Something went wrong setting up your account. Please try again."
-      );
-      res.redirect(`${FRONTEND_URL}/login?error=${errorMessage}`);
-      return;
-    }
-
-    const payload: JwtPayload = {
-      userId: userWithClient.id,
-      email: userWithClient.email,
-      role: userWithClient.role,
-      clientId: userWithClient.clientId,
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
-    });
-
-    // Redirect to frontend with token
-    res.redirect(
-      `${FRONTEND_URL}/auth/callback?token=${token}&returnUrl=${encodeURIComponent(returnUrl)}`
-    );
-  } catch (err) {
-    console.error("Google auth error:", err);
-    const errorMessage = encodeURIComponent(
-      err instanceof Error && err.message
-        ? err.message
-        : "Unable to sign in with Google. Please try again or use email sign-in."
-    );
-    res.redirect(`${FRONTEND_URL}/login?error=${errorMessage}`);
-  }
 };
 
 interface ForgotPasswordRequestBody {

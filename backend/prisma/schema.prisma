@@ -22,6 +22,10 @@ model User {
   client               Client?   @relation(fields: [clientId], references: [id])
   passwordResetToken   String?
   passwordResetExpires DateTime?
+  lastLoginAt          DateTime?
+  active               Boolean   @default(true)
+  accountLocked        Boolean   @default(false)
+  registeredDevices    Json?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

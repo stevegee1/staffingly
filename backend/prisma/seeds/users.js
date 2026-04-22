@@ -1,48 +1,196 @@
-/**
- * seeds/users.js
- * Seeds system users
- */
+import bcrypt from "bcryptjs";
+
+const USERS = [
+  {
+    email: "dan@staffingly.com",
+    name: "Dan Nandan",
+    role: "SUPER_ADMIN",
+    password: "kL7$mP2#vW9&qZ5!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 30),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [
+      { label: "MacBook Pro - Chrome", added: "2024-01-15" },
+      { label: "iPhone 15 Pro", added: "2024-02-10" },
+    ],
+  },
+  {
+    email: "david@staffingly.com",
+    name: "David Udo",
+    role: "SUPER_ADMIN",
+    password: "davidudo",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Dell XPS 15", added: "2024-03-01" }],
+  },
+  {
+    email: "peter@staffingly.com",
+    name: "Peter Nkobowo",
+    role: "SUPER_ADMIN",
+    password: "Y4@fT9#wP1!kH8zL6$",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "ThinkPad X1 Carbon", added: "2023-11-20" }],
+  },
+  {
+    email: "jordan@staffingly.com",
+    name: "Jordan Chen",
+    role: "FINANCE_ADMIN",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [],
+  },
+  {
+    email: "alex@staffingly.com",
+    name: "Alex Rivera",
+    role: "STAFFINGLY_ADMIN",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "MacBook Air", added: "2024-02-28" }],
+  },
+  {
+    email: "morgan@staffingly.com",
+    name: "Morgan Patel",
+    role: "STAFFINGLY_ADMIN",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 72),
+    active: false,
+    accountLocked: false,
+    registeredDevices: [],
+  },
+  {
+    email: "casey@staffingly.com",
+    name: "Casey Nguyen",
+    role: "STAFFINGLY_SUPERVISOR",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 15),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Windows Desktop - Edge", added: "2023-09-12" }],
+  },
+  {
+    email: "dana@staffingly.com",
+    name: "Dana Kim",
+    role: "STAFFINGLY_SPECIALIST",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 1),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "MacBook Pro - Safari", added: "2024-01-05" }],
+  },
+  {
+    email: "sam@staffingly.com",
+    name: "Sam Torres",
+    role: "STAFFINGLY_SPECIALIST",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 40),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Surface Laptop", added: "2024-03-04" }],
+  },
+  {
+    email: "priya@staffingly.com",
+    name: "Priya Mehta",
+    role: "STAFFINGLY_SPECIALIST",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 75),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Mac mini", added: "2024-02-19" }],
+  },
+  {
+    email: "taylor@staffingly.com",
+    name: "Taylor Brooks",
+    role: "STAFFINGLY_SPECIALIST",
+    password: "Password123!",
+    lastLoginAt: null,
+    active: true,
+    accountLocked: true,
+    registeredDevices: [],
+  },
+  {
+    email: "drew@sunrise-clinic.com",
+    name: "Drew Okafor",
+    role: "CLIENT_USER",
+    clientId: "client-sunrise-family-clinic",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Clinic Workstation 1", added: "2023-10-01" }],
+  },
+  {
+    email: "james@lakeview.com",
+    name: "James Park",
+    role: "CLIENT_USER",
+    clientId: "client-lakeview-orthopedics",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Clinic Tablet", added: "2024-03-15" }],
+  },
+  {
+    email: "aisha@metro-mh.com",
+    name: "Aisha Rahman",
+    role: "CLIENT_USER",
+    clientId: "client-metro-mental-health-associates",
+    password: "Password123!",
+    lastLoginAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14),
+    active: false,
+    accountLocked: true,
+    registeredDevices: [],
+  },
+  {
+    email: "contact@demopractice.com",
+    name: "Demo Practice Admin",
+    role: "CLIENT_USER",
+    clientId: "client-demo",
+    password: "Password123!",
+    lastLoginAt: new Date(),
+    active: true,
+    accountLocked: false,
+    registeredDevices: [{ label: "Demo MacBook", added: "2024-04-01" }],
+  },
+];
 
 export async function seedUsers(prisma) {
-  await prisma.user.upsert({
-    where: { email: "admin@staffverify.com" },
-    update: {},
-    create: {
-      email: "admin@staffverify.com",
-      name: "System Admin",
-      role: "SUPER_ADMIN",
-    },
-  });
+  const saltRounds = 10;
 
-  await prisma.user.upsert({
-    where: { email: "finance@staffverify.com" },
-    update: {},
-    create: {
-      email: "finance@staffverify.com",
-      name: "Finance Admin",
-      role: "FINANCE_ADMIN",
-    },
-  });
+  for (const user of USERS) {
+    const passwordHash = await bcrypt.hash(user.password, saltRounds);
 
-  await prisma.user.upsert({
-    where: { email: "supervisor@staffverify.com" },
-    update: {},
-    create: {
-      email: "supervisor@staffverify.com",
-      name: "Team Supervisor",
-      role: "STAFFINGLY_SUPERVISOR",
-    },
-  });
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name,
+        role: user.role,
+        clientId: user.clientId || null,
+        passwordHash,
+        lastLoginAt: user.lastLoginAt || null,
+        active: user.active !== false,
+        accountLocked: user.accountLocked || false,
+        registeredDevices: user.registeredDevices ? user.registeredDevices : null,
+      },
+      create: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        clientId: user.clientId || null,
+        passwordHash,
+        lastLoginAt: user.lastLoginAt || null,
+        active: user.active !== false,
+        accountLocked: user.accountLocked || false,
+        registeredDevices: user.registeredDevices ? user.registeredDevices : null,
+      },
+    });
+  }
 
-  await prisma.user.upsert({
-    where: { email: "specialist@staffverify.com" },
-    update: {},
-    create: {
-      email: "specialist@staffverify.com",
-      name: "Auth Specialist",
-      role: "STAFFINGLY_SPECIALIST",
-    },
-  });
-
-  console.log("✅ Created sample users");
+  console.log("✅ Created users");
 }
