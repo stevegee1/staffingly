@@ -192,7 +192,7 @@ export default function EligibilityHistory() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Patient name or ID…"
-                className="pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none w-52"
+                className="w-full sm:w-72 pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#0a7e87]"
               />
             </div>
             <AppSelect
@@ -204,7 +204,7 @@ export default function EligibilityHistory() {
                 { label: "Inactive", value: "Inactive" },
                 { label: "Unknown", value: "Unknown" },
               ]}
-              triggerClassName="w-[140px]"
+              triggerClassName="h-9 w-[150px] rounded-xl text-xs"
             />
             <AppSelect
               value={filterMethod}
@@ -216,7 +216,7 @@ export default function EligibilityHistory() {
                 { label: "EMR Integration", value: "EMR" },
                 { label: "Portal Automation", value: "Portal" },
               ]}
-              triggerClassName="w-[160px]"
+              triggerClassName="h-9 w-[180px] rounded-xl text-xs"
             />
           </div>
           <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">

@@ -4,7 +4,6 @@ import { api } from "@/lib/api";
 import { useAuthUserQuery, useEntityListQuery } from "@/lib/query";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import {
-  BillingHeader,
   BillingAccessDenied,
   canAccessBilling,
 } from "@/components/billing/BillingAccessGuard";
@@ -127,10 +126,16 @@ export default function BillingDashboard() {
       breadcrumbs={["Billing"]}
     >
       <div className="max-w-[1400px] mx-auto space-y-6">
-        <BillingHeader
-          title="Billing Dashboard"
-          subtitle="Automated billing, invoicing & payment management"
-        />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Billing Dashboard</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Automated billing, invoicing & payment management for all clients.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -178,7 +183,7 @@ export default function BillingDashboard() {
                   { label: "Payment Failed", value: "payment_failed" },
                   { label: "Draft", value: "draft" },
                 ]}
-                triggerClassName="w-[180px]"
+                triggerClassName="h-9 w-[180px] rounded-xl text-xs"
               />
               <button
                 onClick={exportCSV}

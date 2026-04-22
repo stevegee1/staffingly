@@ -4,7 +4,6 @@ import { api } from "@/lib/api";
 import { useAuthUserQuery, useEntityListQuery } from "@/lib/query";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import {
-  BillingHeader,
   BillingAccessDenied,
   canAccessBilling,
 } from "@/components/billing/BillingAccessGuard";
@@ -326,19 +325,22 @@ export default function PricingPackages() {
       breadcrumbs={["Admin", "Pricing"]}
     >
       <div className="max-w-[1400px] mx-auto space-y-6">
-        <BillingHeader
-          title="Pricing Packages"
-          subtitle="Manage client pricing plans and rate structures"
-        />
-
-        <div className="flex justify-end">
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm"
-            style={{ backgroundColor: "#f6b037" }}
-          >
-            <Plus className="w-4 h-4" /> New Package
-          </button>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Pricing Packages</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Manage client pricing plans, rate structures, and included service volumes.
+              </p>
+            </div>
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-sm"
+              style={{ backgroundColor: "#293682" }}
+            >
+              <Plus className="w-4 h-4" /> New Package
+            </button>
+          </div>
         </div>
 
         {loadingUser || loadingPackages ? (
