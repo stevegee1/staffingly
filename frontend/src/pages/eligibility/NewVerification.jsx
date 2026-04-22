@@ -39,7 +39,7 @@ export default function NewVerification() {
       title="New Eligibility Verification"
       breadcrumbs={["Eligibility", "New Check"]}
     >
-      <div className="max-w-5xl mx-auto">
+      <div>
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-xl border border-slate-200 p-1 mb-6 w-fit">
           {TABS.map((tab, i) => (

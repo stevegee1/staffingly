@@ -136,7 +136,7 @@ export default function TopBar({ user, title, breadcrumbs = [] }) {
   const showIntegrations = user.role !== "client_user";
 
   return (
-    <header className="border-b border-slate-200 bg-white flex-shrink-0">
+    <>
       {/* Role stripe */}
       <div className="px-6 py-1.5 flex items-center gap-2" style={{ backgroundColor: stripe.bg }}>
         <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textColor }} />
@@ -151,99 +151,101 @@ export default function TopBar({ user, title, breadcrumbs = [] }) {
         </span>
       </div>
 
-      {/* Main bar */}
-      <div className="px-6 py-3 flex items-center justify-between gap-4">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1 text-sm text-slate-500 min-w-0">
-          <span className="text-slate-400 text-xs">Staffingly.AI</span>
-          {breadcrumbs.length > 0
-            ? breadcrumbs.map((crumb, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-                  <span
-                    className={
-                      i === breadcrumbs.length - 1
-                        ? "font-bold text-slate-800 text-sm"
-                        : "text-slate-500 text-xs"
-                    }
-                  >
-                    {crumb}
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        {/* Main bar */}
+        <div className="px-6 py-3 flex items-center justify-between gap-4">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1 text-sm text-slate-500 min-w-0">
+            <span className="text-slate-400 text-xs">Staffingly.AI</span>
+            {breadcrumbs.length > 0
+              ? breadcrumbs.map((crumb, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                    <span
+                      className={
+                        i === breadcrumbs.length - 1
+                          ? "font-bold text-slate-800 text-sm"
+                          : "text-slate-500 text-xs"
+                      }
+                    >
+                      {crumb}
+                    </span>
                   </span>
-                </span>
-              ))
-            : title && (
-                <>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-                  <span className="font-bold text-slate-800 text-sm truncate">{title}</span>
-                </>
-              )}
-        </div>
-
-        {/* Right side */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <button className="relative w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
-            <Bell className="w-4 h-4 text-slate-500" />
-            {notifCount > 0 && (
-              <span
-                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center"
-                style={{ backgroundColor: "#f6b037", color: "#002082" }}
-              >
-                {notifCount}
-              </span>
-            )}
-          </button>
-          <div className="h-6 w-px bg-slate-200" />
-          <div className="flex items-center gap-2">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-              style={{ backgroundColor: ROLE_STRIPE[user.role]?.bg || "#293682" }}
-            >
-              {user.name?.charAt(0) || "U"}
-            </div>
-            <div className="hidden md:block text-right">
-              <p className="text-xs font-semibold text-slate-700 leading-tight">
-                {user.name || user.email}
-              </p>
-              <p className="text-[10px] text-slate-400 leading-tight capitalize">
-                {user.role?.replace(/_/g, " ")}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Integration status bar */}
-      {showIntegrations && (
-        <div
-          className="px-6 py-1.5 border-t border-slate-100 flex items-center gap-1 relative"
-          style={{ backgroundColor: "#f8faff" }}
-        >
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 flex-shrink-0">
-            Integrations
-          </span>
-          <div className="flex items-center gap-1 flex-wrap relative">
-            {INTEGRATIONS.map((intg) => (
-              <div key={intg.key} className="relative">
-                <IntegrationDot
-                  intg={intg}
-                  onClick={(i) => setActiveIntg(activeIntg?.key === i.key ? null : i)}
-                />
-                {activeIntg?.key === intg.key && (
-                  <IntegrationCard intg={intg} onClose={() => setActiveIntg(null)} />
+                ))
+              : title && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                    <span className="font-bold text-slate-800 text-sm truncate">{title}</span>
+                  </>
                 )}
-              </div>
-            ))}
           </div>
-          <div className="ml-auto flex items-center gap-1 text-[10px] text-slate-400">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>3 ok</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 ml-1" />
-            <span>1 slow</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-1" />
-            <span>1 down</span>
+
+          {/* Right side */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button className="relative w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <Bell className="w-4 h-4 text-slate-500" />
+              {notifCount > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center"
+                  style={{ backgroundColor: "#f6b037", color: "#002082" }}
+                >
+                  {notifCount}
+                </span>
+              )}
+            </button>
+            <div className="h-6 w-px bg-slate-200" />
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                style={{ backgroundColor: ROLE_STRIPE[user.role]?.bg || "#293682" }}
+              >
+                {user.name?.charAt(0) || "U"}
+              </div>
+              <div className="hidden md:block text-right">
+                <p className="text-xs font-semibold text-slate-700 leading-tight">
+                  {user.name || user.email}
+                </p>
+                <p className="text-[10px] text-slate-400 leading-tight capitalize">
+                  {user.role?.replace(/_/g, " ")}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-    </header>
+
+        {/* Integration status bar */}
+        {showIntegrations && (
+          <div
+            className="px-6 py-1.5 border-t border-slate-100 flex items-center gap-1 relative"
+            style={{ backgroundColor: "#f8faff" }}
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 flex-shrink-0">
+              Integrations
+            </span>
+            <div className="flex items-center gap-1 flex-wrap relative">
+              {INTEGRATIONS.map((intg) => (
+                <div key={intg.key} className="relative">
+                  <IntegrationDot
+                    intg={intg}
+                    onClick={(i) => setActiveIntg(activeIntg?.key === i.key ? null : i)}
+                  />
+                  {activeIntg?.key === intg.key && (
+                    <IntegrationCard intg={intg} onClose={() => setActiveIntg(null)} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-1 text-[10px] text-slate-400">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>3 ok</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 ml-1" />
+              <span>1 slow</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-1" />
+              <span>1 down</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
