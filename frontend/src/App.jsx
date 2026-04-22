@@ -4,7 +4,7 @@ import { queryClientInstance } from "@/lib/api/clients/queryClient";
 import NavigationTracker from "@/components/NavigationTracker";
 import { pagesConfig } from "./pages.config";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
-import PageNotFound from "./pages/PageNotFound";
+import PageNotFound from "./pages/core/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/contexts/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 

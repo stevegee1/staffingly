@@ -47,8 +47,8 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import AutomationQueue from "./pages/AutomationQueue";
-import BillingDashboard from "./pages/BillingDashboard";
+import AutomationQueue from "./pages/cases/AutomationQueue";
+import BillingDashboard from "./pages/finance/BillingDashboard";
 import ClientBilling from "./pages/clients/ClientBilling";
 import ClientBillingProfile from "./pages/clients/ClientBillingProfile";
 import ClientBrandingAdmin from "./pages/clients/ClientBrandingAdmin";
@@ -61,36 +61,36 @@ import ClientPortal from "./pages/clients/ClientPortal";
 import ClientReports from "./pages/clients/ClientReports";
 import ClientStorageSettings from "./pages/clients/ClientStorageSettings";
 import Clients from "./pages/clients/Clients";
-import Dashboard from "./pages/Dashboard";
-import DriveSyncLogs from "./pages/DriveSyncLogs";
+import Dashboard from "./pages/core/Dashboard";
+import DriveSyncLogs from "./pages/system/DriveSyncLogs";
 import EligibilityDashboard from "./pages/eligibility/EligibilityDashboard";
 import EligibilityHistory from "./pages/eligibility/EligibilityHistory";
-import FAPayroll from "./pages/FAPayroll";
+import FAPayroll from "./pages/finance/FAPayroll";
 import Login from "./pages/authentication/Login";
 import Register from "./pages/authentication/Register";
 import AuthCallback from "./pages/authentication/AuthCallback";
 import ForgotPassword from "./pages/authentication/ForgotPassword";
 import ResetPassword from "./pages/authentication/ResetPassword";
-import KnowledgeBaseAnalytics from "./pages/KnowledgeBaseAnalytics";
+import KnowledgeBaseAnalytics from "./pages/system/KnowledgeBaseAnalytics";
 import NewVerification from "./pages/eligibility/NewVerification";
-import Patients from "./pages/Patients";
-import PayerRules from "./pages/PayerRules";
-import PricingPackages from "./pages/PricingPackages";
-import PriorAuth from "./pages/PriorAuth";
-import PriorAuthCase from "./pages/PriorAuthCase";
+import Patients from "./pages/clinical/Patients";
+import PayerRules from "./pages/system/PayerRules";
+import PricingPackages from "./pages/finance/PricingPackages";
+import PriorAuth from "./pages/cases/PriorAuth";
+import PriorAuthCase from "./pages/cases/PriorAuthCase";
 import Processing from "./pages/eligibility/Processing";
-import ProviderOnboarding from "./pages/ProviderOnboarding";
-import ReviewQueue from "./pages/ReviewQueue";
-import SAAuditLogs from "./pages/SAAuditLogs";
+import ProviderOnboarding from "./pages/clinical/ProviderOnboarding";
+import ReviewQueue from "./pages/cases/ReviewQueue";
+import SAAuditLogs from "./pages/admin/SAAuditLogs";
 import SAClients from "./pages/clients/SAClients";
-import SADashboard from "./pages/SADashboard";
-import SASecuritySettings from "./pages/SASecuritySettings";
-import SAUsers from "./pages/SAUsers";
-import Settings from "./pages/Settings";
-import SpecialistCaseView from "./pages/SpecialistCaseView";
-import StaffTracker from "./pages/StaffTracker";
-import SupervisorApprovalQueue from "./pages/SupervisorApprovalQueue";
-import UnmatchedDocuments from "./pages/UnmatchedDocuments";
+import SADashboard from "./pages/admin/SADashboard";
+import SASecuritySettings from "./pages/admin/SASecuritySettings";
+import SAUsers from "./pages/admin/SAUsers";
+import Settings from "./pages/core/Settings";
+import SpecialistCaseView from "./pages/cases/SpecialistCaseView";
+import StaffTracker from "./pages/staff/StaffTracker";
+import SupervisorApprovalQueue from "./pages/cases/SupervisorApprovalQueue";
+import UnmatchedDocuments from "./pages/cases/UnmatchedDocuments";
 import __Layout from "./Layout.jsx";
 
 export const PAGES = {
