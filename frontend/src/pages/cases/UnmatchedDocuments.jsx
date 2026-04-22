@@ -224,6 +224,17 @@ export default function UnmatchedDocuments() {
       breadcrumbs={["Documents", "Unmatched Queue"]}
     >
       <div className="max-w-[1400px] mx-auto space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Unmatched Documents</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Review and match documents that couldn't be automatically assigned to a case.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {staleCount > 0 && (
           <div className="rounded-xl p-4 flex items-center gap-3 border-2 border-red-300 bg-red-50">
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
@@ -235,25 +246,27 @@ export default function UnmatchedDocuments() {
         )}
 
         {/* Controls */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by file name, client, or patient…"
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#293682]/30"
+        <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="flex flex-wrap gap-3 flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by file name, client, or patient…"
+                className="w-full sm:w-72 pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#0a7e87]"
+              />
+            </div>
+            <AppSelect
+              value={filterStatus}
+              onValueChange={setFilterStatus}
+              options={["All", "Unmatched", "Matched", "Dismissed"]}
+              triggerClassName="h-9 w-[180px] rounded-xl px-3 py-2 text-xs"
             />
           </div>
-          <AppSelect
-            value={filterStatus}
-            onValueChange={setFilterStatus}
-            options={["All", "Unmatched", "Matched", "Dismissed"]}
-            triggerClassName="w-[140px]"
-          />
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 text-sm text-slate-600">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 text-xs text-slate-600 border border-slate-100">
             <FileText className="w-4 h-4" />
-            <span className="font-semibold">
+            <span className="font-bold">
               {docs.filter((d) => d.status === "Unmatched").length}
             </span>{" "}
             pending

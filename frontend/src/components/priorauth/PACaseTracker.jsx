@@ -81,34 +81,36 @@ export default function PACaseTracker({ user: _user, onStartNew }) {
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Case ID or patient initials…"
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#293682]/30"
+      <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shadow-sm">
+        <div className="flex flex-1 flex-wrap gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by Case ID or patient initials…"
+              className="w-full sm:w-72 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#293682]"
+            />
+          </div>
+          <AppSelect
+            value={filterStatus}
+            onValueChange={setFilterStatus}
+            options={["All", ...Object.keys(STATUS_STYLES)]}
+            triggerClassName="h-9 w-[180px] rounded-xl px-3 py-2 text-xs"
+          />
+          <AppSelect
+            value={filterUrgency}
+            onValueChange={setFilterUrgency}
+            options={["All", "Routine", "Urgent"]}
+            triggerClassName="h-9 w-[140px] rounded-xl px-3 py-2 text-xs"
           />
         </div>
-        <AppSelect
-          value={filterStatus}
-          onValueChange={setFilterStatus}
-          options={["All", ...Object.keys(STATUS_STYLES)]}
-          triggerClassName="w-[180px]"
-        />
-        <AppSelect
-          value={filterUrgency}
-          onValueChange={setFilterUrgency}
-          options={["All", "Routine", "Urgent"]}
-          triggerClassName="w-[120px]"
-        />
         <button
           onClick={onStartNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-bold transition-opacity hover:opacity-90"
+          className="flex items-center gap-2 px-5 py-2 rounded-xl text-white text-xs font-bold transition-opacity hover:opacity-90"
           style={{ backgroundColor: "#293682" }}
         >
-          <Plus className="w-4 h-4" /> New PA
+          <Plus className="w-4 h-4" /> Start New Case
         </button>
       </div>
 
