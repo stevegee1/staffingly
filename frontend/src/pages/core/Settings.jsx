@@ -87,7 +87,10 @@ export default function Settings() {
   const { data: user } = useAuthUserQuery();
 
   useEffect(() => {
-    if (user && !["super_admin", "staffingly_admin", "admin"].includes((user.role || "").toLowerCase())) {
+    if (
+      user &&
+      !["super_admin", "staffingly_admin", "admin"].includes((user.role || "").toLowerCase())
+    ) {
       window.location.href = createPageUrl("dashboard");
     }
   }, [user]);
