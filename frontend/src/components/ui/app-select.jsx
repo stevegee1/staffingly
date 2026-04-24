@@ -14,6 +14,7 @@ export default function AppSelect({
   placeholder = "",
   triggerClassName = "",
   contentClassName = "",
+  disabled = false,
 }) {
   const normalizedOptions = options.map((option) =>
     typeof option === "string"
@@ -30,13 +31,13 @@ export default function AppSelect({
   const selectedOption = normalizedOptions.find((option) => option.value === value);
 
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger className={cn("w-full rounded-xl border-slate-200", triggerClassName)}>
         <SelectValue placeholder={placeholder}>{selectedOption?.label}</SelectValue>
       </SelectTrigger>
       <SelectContent className={contentClassName}>
         {normalizedOptions.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
+          <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </SelectItem>
         ))}

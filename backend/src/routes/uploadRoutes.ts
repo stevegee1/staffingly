@@ -42,6 +42,11 @@ router.post(
   asyncHandler(uploadController.uploadInsuranceCard)
 );
 
+router.get(
+  "/insurance-card/ocr-providers",
+  asyncHandler(uploadController.getInsuranceCardOcrProviders)
+);
+
 // Extract data from insurance card (either from uploadId or direct file upload)
 router.post(
   "/insurance-card/extract",
@@ -51,5 +56,11 @@ router.post(
 
 // Get URL for uploaded insurance card
 router.get("/insurance-card/:id/url", asyncHandler(uploadController.getInsuranceCardUrl));
+
+// Confirm reviewed extraction and attach the card to a saved insurance policy
+router.post(
+  "/insurance-card/:id/confirm",
+  asyncHandler(uploadController.confirmInsuranceCard)
+);
 
 export default router;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useEntityListQuery } from "@/lib/query";
 import { motion } from "framer-motion";
-import { X, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileImage, Upload, X } from "lucide-react";
 import AppSelect from "@/components/ui/app-select";
 import InsuranceCardCapture from "./InsuranceCardCapture";
 
@@ -26,6 +26,24 @@ const POLICY_TYPES = [
 ];
 
 const RELATIONSHIPS = ["Self", "Spouse", "Child", "Other Dependent"];
+
+function normalizeSelectValue(value, options) {
+  if (!value) return "";
+
+  const normalizedOptions = options.map((option) =>
+    typeof option === "string" ? option : option.value
+  );
+  const matched = normalizedOptions.find(
+    (option) => option.toLowerCase() === String(value).toLowerCase()
+  );
+
+  return matched || value;
+}
+
+function withCurrentOption(options, value) {
+  if (!value) return options;
+  return options.includes(value) ? options : [...options, value];
+}
 
 function TextField({ label, value, onChange, type = "text", placeholder = "", prefix = null }) {
   return (
@@ -70,11 +88,22 @@ function SelectField({ label, value, onValueChange, options, placeholder = "Sele
   );
 }
 
-export default function InsurancePolicyForm({ policy, patientId, clientId, onClose, onSave }) {
+export default function InsurancePolicyForm({
+  policy,
+  patient,
+  patientId,
+  clientId,
+  onClose,
+  onSave,
+}) {
   const { data: payerRules = [] } = useEntityListQuery("PayerRule", { limit: 100 }, null);
+  const knownPayerNames = [...new Set(payerRules.map((rule) => rule.payerName).filter(Boolean))];
+  const initialCustomPayerName =
+    policy?.payerName && !knownPayerNames.includes(policy.payerName) ? policy.payerName : "";
   const [form, setForm] = useState({
     policyType: policy?.policyType || "PRIMARY",
-    payerName: policy?.payerName || "",
+    payerName: initialCustomPayerName ? "Other" : policy?.payerName || "",
+    customPayerName: initialCustomPayerName,
     payerId: policy?.payerId || "",
     memberId: policy?.memberId || "",
     groupNumber: policy?.groupNumber || "",
@@ -94,20 +123,19 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showCardCapture, setShowCardCapture] = useState(false);
-  const payerOptions = [
-    ...new Set(
-      payerRules
-        .map((rule) => rule.payerName)
-        .filter(Boolean)
-        .concat("Other")
-    ),
-  ];
+  const [captureReview, setCaptureReview] = useState(null);
+  const resolvedPayerName =
+    form.payerName === "Other" ? form.customPayerName.trim() : form.payerName.trim();
+  const payerOptions = withCurrentOption([
+    ...new Set(knownPayerNames.concat("Other")),
+  ], form.payerName);
+  const planTypeOptions = withCurrentOption(PLAN_TYPES, form.planType);
 
   const updateField = (field) => (event) =>
     setForm((current) => ({ ...current, [field]: event.target.value }));
 
   const handleSave = async () => {
-    if (!form.payerName.trim() || !form.memberId.trim()) {
+    if (!resolvedPayerName || !form.memberId.trim()) {
       setError("Payer name and member ID are required");
       return;
     }
@@ -123,8 +151,10 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
     try {
       await onSave({
         ...form,
+        payerName: resolvedPayerName,
         copayPcp: form.copayPcp ? parseFloat(form.copayPcp) : null,
         copaySpecialist: form.copaySpecialist ? parseFloat(form.copaySpecialist) : null,
+        insuranceCardCapture: captureReview,
       });
       onClose();
     } catch (err) {
@@ -133,21 +163,27 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
     }
   };
 
-  const handleOcrExtraction = (extractedData) => {
+  const handleOcrExtraction = (captureResult) => {
+    const extractedData = captureResult?.fields || {};
     setForm((prev) => ({
       ...prev,
-      payerName: extractedData.payerName || prev.payerName,
+      payerName: normalizeSelectValue(extractedData.payerName, payerOptions) || prev.payerName,
+      payerId: extractedData.payerId || prev.payerId,
       memberId: extractedData.memberId || prev.memberId,
       groupNumber: extractedData.groupNumber || prev.groupNumber,
       subscriberName: extractedData.subscriberName || prev.subscriberName,
       subscriberDob: extractedData.subscriberDob || prev.subscriberDob,
       planName: extractedData.planName || prev.planName,
-      planType: extractedData.planType || prev.planType,
+      planType: normalizeSelectValue(extractedData.planType, PLAN_TYPES) || prev.planType,
       rxBin: extractedData.rxBin || prev.rxBin,
       rxPcn: extractedData.rxPcn || prev.rxPcn,
       rxGroup: extractedData.rxGroup || prev.rxGroup,
+      copayPcp: extractedData.copay
+        ? extractedData.copay.replace(/[^0-9.]/g, "") || prev.copayPcp
+        : prev.copayPcp,
       effectiveDate: extractedData.effectiveDate || prev.effectiveDate,
     }));
+    setCaptureReview(captureResult);
     setShowCardCapture(false);
   };
 
@@ -212,16 +248,144 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
             </div>
           ) : null}
 
-          {!policy ? (
-            <section className="rounded-[24px] border border-dashed border-slate-300 bg-white p-5 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setShowCardCapture(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm font-semibold text-slate-600 transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+          <section className="rounded-[24px] border border-dashed border-slate-300 bg-white p-5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowCardCapture(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm font-semibold text-slate-600 transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+            >
+              <Upload className="h-5 w-5 text-slate-500" />
+              {captureReview ? "Replace Insurance Card Scan" : "Upload Insurance Card to Auto-Fill"}
+            </button>
+
+            {captureReview ? (
+              <div
+                className={`mt-4 rounded-2xl border px-4 py-3 ${
+                  captureReview.requiresReview
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-emerald-200 bg-emerald-50"
+                }`}
               >
-                <Upload className="h-5 w-5 text-slate-500" />
-                Upload Insurance Card to Auto-Fill
-              </button>
+                <div className="flex items-start gap-3">
+                  {captureReview.requiresReview ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                  )}
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-semibold ${
+                        captureReview.requiresReview ? "text-amber-800" : "text-emerald-800"
+                      }`}
+                    >
+                      {captureReview.scannedSides?.length
+                        ? `${captureReview.scannedSides.length} card side${
+                            captureReview.scannedSides.length === 1 ? "" : "s"
+                          } captured`
+                        : "Insurance card captured"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      OCR confidence {captureReview.overallConfidence ?? "--"}%
+                      {captureReview.lowConfidenceFields?.length
+                        ? ` • Review ${captureReview.lowConfidenceFields.length} highlighted field(s) before saving`
+                        : " • Ready to attach to this policy"}
+                    </p>
+                    {captureReview.scannedSides?.length ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Saved sides: {captureReview.scannedSides.join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {captureReview?.uploads && captureReview.scannedSides?.length ? (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {captureReview.scannedSides.map((side) => {
+                  const upload = captureReview.uploads?.[side];
+                  const title = side === "FRONT" ? "Front of card" : "Back of card";
+
+                  return (
+                    <div
+                      key={side}
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          {title}
+                        </p>
+                        {upload?.originalFileName ? (
+                          <span className="truncate text-[11px] text-slate-400">
+                            {upload.originalFileName}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {upload?.preview && upload.preview !== "pdf" ? (
+                        <img
+                          src={upload.preview}
+                          alt={title}
+                          className="h-40 w-full object-contain bg-slate-50"
+                        />
+                      ) : (
+                        <div className="flex h-40 flex-col items-center justify-center gap-2 px-4 text-center">
+                          <FileImage className="h-8 w-8 text-slate-300" />
+                          <p className="text-xs text-slate-500">
+                            {upload?.originalFileName || "No preview available"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+
+          {patient ? (
+            <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3">
+                <h4 className="text-sm font-bold text-slate-800">Patient Details</h4>
+                <p className="mt-1 text-xs text-slate-500">
+                  This insurance policy will be attached to the patient below.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Patient Name
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {patient.firstName} {patient.middleName ? `${patient.middleName} ` : ""}
+                    {patient.lastName}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Date of Birth
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {patient.dob ? new Date(patient.dob).toLocaleDateString() : "Not available"}
+                  </p>
+                </div>
+                {patient.email ? (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Email
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">{patient.email}</p>
+                  </div>
+                ) : null}
+                {patient.phone ? (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Phone
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">{patient.phone}</p>
+                  </div>
+                ) : null}
+              </div>
             </section>
           ) : null}
 
@@ -264,7 +428,16 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
                   label="Insurance Payer *"
                   value={form.payerName}
                   onValueChange={(value) =>
-                    setForm((current) => ({ ...current, payerName: value }))
+                    setForm((current) => ({
+                      ...current,
+                      payerName: value,
+                      customPayerName:
+                        value === "Other"
+                          ? current.customPayerName
+                          : value !== current.customPayerName
+                            ? current.customPayerName
+                            : "",
+                    }))
                   }
                   options={payerOptions}
                   placeholder="Select payer..."
@@ -275,6 +448,14 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
                   onChange={updateField("payerId")}
                   placeholder="e.g., 87726"
                 />
+                {form.payerName === "Other" ? (
+                  <TextField
+                    label="Other Payer Name *"
+                    value={form.customPayerName}
+                    onChange={updateField("customPayerName")}
+                    placeholder="Enter payer name"
+                  />
+                ) : null}
               </div>
             </div>
           </section>
@@ -351,7 +532,7 @@ export default function InsurancePolicyForm({ policy, patientId, clientId, onClo
                 label="Plan Type"
                 value={form.planType}
                 onValueChange={(value) => setForm((current) => ({ ...current, planType: value }))}
-                options={PLAN_TYPES}
+                options={planTypeOptions}
                 placeholder="Select type..."
               />
               <TextField

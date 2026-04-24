@@ -94,6 +94,20 @@ interface InsuranceCardUploadBody {
   cardSide: "FRONT" | "BACK";
 }
 
+interface ConfirmInsuranceCardBody {
+  policyId: string;
+  patientId?: string;
+  extractedFields?: Record<string, string | null>;
+  confidenceScores?: Record<string, number>;
+  overallConfidence?: number;
+  requiresReview?: boolean;
+}
+
+interface ExtractInsuranceCardBody {
+  uploadId?: string;
+  provider?: ocrService.OcrProvider;
+}
+
 /**
  * Upload an insurance card image
  * Stores in S3 (production) or local filesystem (development)
@@ -196,11 +210,12 @@ export const extractInsuranceCard = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const { uploadId } = req.body as { uploadId?: string };
+  const { uploadId, provider = "auto" } = req.body as ExtractInsuranceCardBody;
   const file = req.file as MulterFile | undefined;
 
   let imageBuffer: Buffer;
   let cardUploadId: string | null = null;
+  let mimeType: string | undefined;
 
   if (uploadId) {
     // Extract from previously uploaded card
@@ -217,6 +232,7 @@ export const extractInsuranceCard = async (
     }
 
     cardUploadId = cardUpload.id;
+    mimeType = cardUpload.mimeType;
 
     // Get the file from storage
     if (cardUpload.storageType === "local") {
@@ -238,6 +254,7 @@ export const extractInsuranceCard = async (
   } else if (file) {
     // Extract from directly uploaded file
     imageBuffer = file.buffer;
+    mimeType = file.mimetype;
   } else {
     res.status(400).json({
       success: false,
@@ -247,7 +264,7 @@ export const extractInsuranceCard = async (
   }
 
   // Run OCR extraction
-  const extraction = await ocrService.extractInsuranceCard(imageBuffer);
+  const extraction = await ocrService.extractInsuranceCard(imageBuffer, mimeType, provider);
 
   // Update card upload record with extracted data if we have one
   if (cardUploadId) {
@@ -275,8 +292,24 @@ export const extractInsuranceCard = async (
       channelUsed: extraction.channelUsed,
       processingTimeMs: extraction.processingTimeMs,
       uploadId: cardUploadId,
+      provider,
     },
     error: extraction.error,
+  });
+};
+
+export const getInsuranceCardOcrProviders = async (
+  _req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const providers = await ocrService.getAvailableOcrProviders();
+
+  res.json({
+    success: true,
+    data: {
+      providers,
+      defaultProvider: providers.find((provider) => provider.available)?.id || null,
+    },
   });
 };
 
@@ -313,5 +346,102 @@ export const getInsuranceCardUrl = async (
       url,
       expiresAt: cardUpload.expiresAt,
     },
+  });
+};
+
+/**
+ * Confirm an extracted insurance card and attach it to a saved policy
+ */
+export const confirmInsuranceCard = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params as { id: string };
+  const {
+    policyId,
+    patientId,
+    extractedFields,
+    confidenceScores,
+    overallConfidence,
+    requiresReview,
+  } = req.body as ConfirmInsuranceCardBody;
+
+  if (!policyId) {
+    res.status(400).json({
+      success: false,
+      error: "policyId is required",
+    });
+    return;
+  }
+
+  const [cardUpload, policy] = await Promise.all([
+    prisma.insuranceCardUpload.findUnique({
+      where: { id },
+    }),
+    prisma.insurancePolicy.findUnique({
+      where: { id: policyId },
+      include: {
+        patient: true,
+      },
+    }),
+  ]);
+
+  if (!cardUpload) {
+    res.status(404).json({
+      success: false,
+      error: "Card upload not found",
+    });
+    return;
+  }
+
+  if (!policy || policy.deletedAt) {
+    res.status(404).json({
+      success: false,
+      error: "Insurance policy not found",
+    });
+    return;
+  }
+
+  if (req.user?.role === "CLIENT_USER" && req.user?.clientId !== policy.patient.clientId) {
+    res.status(403).json({
+      success: false,
+      error: "Access denied",
+    });
+    return;
+  }
+
+  if (cardUpload.clientId !== policy.patient.clientId) {
+    res.status(400).json({
+      success: false,
+      error: "Card upload and policy belong to different clients",
+    });
+    return;
+  }
+
+  if (cardUpload.patientId && cardUpload.patientId !== policy.patientId) {
+    res.status(400).json({
+      success: false,
+      error: "Card upload belongs to a different patient",
+    });
+    return;
+  }
+
+  const confirmedUpload = await prisma.insuranceCardUpload.update({
+    where: { id },
+    data: {
+      policyId,
+      patientId: patientId || policy.patientId,
+      extractedData: extractedFields ? JSON.parse(JSON.stringify(extractedFields)) : undefined,
+      confidenceScores: confidenceScores ? JSON.parse(JSON.stringify(confidenceScores)) : undefined,
+      overallConfidence,
+      requiresReview,
+      reviewedAt: new Date(),
+      reviewedBy: req.user?.userId || null,
+    },
+  });
+
+  res.json({
+    success: true,
+    data: confirmedUpload,
   });
 };

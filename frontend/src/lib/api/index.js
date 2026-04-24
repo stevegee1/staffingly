@@ -56,11 +56,16 @@ const priorAuth = {
 const upload = {
   // Upload insurance card image
   insuranceCard: (formData) => apiClient.postFormData("/api/upload/insurance-card", formData),
+  // List available OCR providers for insurance card extraction
+  getInsuranceCardOcrProviders: () => apiClient.get("/api/upload/insurance-card/ocr-providers"),
   // Extract data from insurance card using OCR
   extractInsuranceCard: (formData) =>
     apiClient.postFormData("/api/upload/insurance-card/extract", formData),
   // Get URL for uploaded card
   getInsuranceCardUrl: (uploadId) => apiClient.get(`/api/upload/insurance-card/${uploadId}/url`),
+  // Confirm OCR review and attach the uploaded card to a saved policy
+  confirmInsuranceCard: (uploadId, data) =>
+    apiClient.post(`/api/upload/insurance-card/${uploadId}/confirm`, data),
   // General file upload
   file: (formData) => apiClient.postFormData("/api/upload/file", formData),
 };

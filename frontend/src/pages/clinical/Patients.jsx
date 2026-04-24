@@ -5,6 +5,16 @@ import { api } from "@/lib/api";
 import { queryKeys, useAuthUserQuery, useEntityListQuery } from "@/lib/query";
 import { createPageUrl } from "@/lib/utils/page";
 import { buildPatientWorkflowParams } from "@/lib/utils/workflow";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import PatientForm from "@/components/patients/PatientForm";
 import InsurancePolicyForm from "@/components/patients/InsurancePolicyForm";
@@ -172,6 +182,7 @@ function PatientRow({
   onDelete,
   onAddInsurance,
   onEditInsurance,
+  onDeleteInsurance,
   onVerify,
   onStartPriorAuth,
 }) {
@@ -350,6 +361,13 @@ function PatientRow({
                       >
                         <Edit2 className="h-4 w-4 text-slate-400" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteInsurance(patient, policy)}
+                        className="rounded-lg p-1.5 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-400" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -369,79 +387,14 @@ function PatientRow({
   );
 }
 
-const DUMMY_PATIENTS = [
-  {
-    id: "gp-sarah-mitchell",
-    firstName: "Sarah",
-    lastName: "Mitchell",
-    middleName: "J",
-    dob: "1985-03-14T00:00:00Z",
-    insurancePolicies: [
-      {
-        id: "pol-1",
-        policyType: "PRIMARY",
-        payerName: "UnitedHealthcare",
-        memberId: "UHC-884720193",
-        lastCoverageStatus: "ACTIVE",
-      },
-    ],
-  },
-  {
-    id: "gp-robert-sanchez",
-    firstName: "Robert",
-    lastName: "Sanchez",
-    middleName: "T",
-    dob: "1979-12-03T00:00:00Z",
-    insurancePolicies: [
-      {
-        id: "pol-2",
-        policyType: "PRIMARY",
-        payerName: "Medicaid",
-        memberId: "MCD-112984732",
-        lastCoverageStatus: "UNKNOWN",
-      },
-    ],
-  },
-  {
-    id: "gp-marcus-thompson",
-    firstName: "Marcus",
-    lastName: "Thompson",
-    middleName: "A",
-    dob: "1968-10-11T00:00:00Z",
-    insurancePolicies: [
-      {
-        id: "pol-3",
-        policyType: "PRIMARY",
-        payerName: "Medicare",
-        memberId: "MBI-4EG9-UA8-YK72",
-        lastCoverageStatus: "ACTIVE",
-      },
-    ],
-  },
-  {
-    id: "gp-linda-patel",
-    firstName: "Linda",
-    lastName: "Patel",
-    middleName: "K",
-    dob: "1990-11-30T00:00:00Z",
-    insurancePolicies: [
-      {
-        id: "pol-4",
-        policyType: "PRIMARY",
-        payerName: "Blue Cross Blue Shield",
-        memberId: "BCBS-774930281",
-        lastCoverageStatus: "ACTIVE",
-      },
-    ],
-  },
-];
-
 export default function Patients() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
   const [patientModal, setPatientModal] = useState(null);
   const [insuranceModal, setInsuranceModal] = useState(null);
+  const [patientToDelete, setPatientToDelete] = useState(null);
+  const [insuranceToDelete, setInsuranceToDelete] = useState(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -465,20 +418,7 @@ export default function Patients() {
 
   const patientsQuery = useQuery({
     queryKey: queryKeys.patients.list(patientsParams),
-    queryFn: async () => {
-      const response = await api.patients.list(patientsParams);
-      const dataRaw = response?.data || [];
-
-      // Fallback for demo
-      if (dataRaw.length === 0 && !search) {
-        return {
-          data: DUMMY_PATIENTS,
-          pagination: { total: DUMMY_PATIENTS.length, page: 1, limit: 20 },
-        };
-      }
-
-      return response;
-    },
+    queryFn: () => api.patients.list(patientsParams),
     enabled: Boolean(user),
   });
 
@@ -518,17 +458,46 @@ export default function Patients() {
   const deletePatientMutation = useMutation({
     mutationFn: (patientId) => api.patients.delete(patientId),
     onSuccess: async () => {
+      setPatientToDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ["patients"] });
+    },
+  });
+
+  const deleteInsuranceMutation = useMutation({
+    mutationFn: ({ patientId, policyId }) => api.patients.deleteInsurance(patientId, policyId),
+    onSuccess: async () => {
+      setInsuranceToDelete(null);
       await queryClient.invalidateQueries({ queryKey: ["patients"] });
     },
   });
 
   const saveInsuranceMutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: async (data) => {
       const { patient, policy } = insuranceModal;
-      if (policy?.id) {
-        return api.patients.updateInsurance(patient.id, policy.id, data);
+      const { insuranceCardCapture, ...policyPayload } = data;
+      const savedPolicyResponse = policy?.id
+        ? await api.patients.updateInsurance(patient.id, policy.id, policyPayload)
+        : await api.patients.addInsurance(patient.id, policyPayload);
+      const savedPolicy = savedPolicyResponse?.data || savedPolicyResponse;
+
+      const cardUploads = Object.values(insuranceCardCapture?.uploads || {});
+
+      if (savedPolicy?.id && cardUploads.length > 0) {
+        await Promise.all(
+          cardUploads.map((upload) =>
+            api.upload.confirmInsuranceCard(upload.uploadId, {
+              policyId: savedPolicy.id,
+              patientId: patient.id,
+              extractedFields: upload.fields || {},
+              confidenceScores: upload.confidenceScores || {},
+              overallConfidence: upload.overallConfidence,
+              requiresReview: upload.requiresReview,
+            })
+          )
+        );
       }
-      return api.patients.addInsurance(patient.id, data);
+
+      return savedPolicy;
     },
     onSuccess: async () => {
       setInsuranceModal(null);
@@ -541,14 +510,15 @@ export default function Patients() {
   };
 
   const handleDeletePatient = async (patient) => {
-    if (!confirm(`Delete ${patient.firstName} ${patient.lastName}? This cannot be undone.`)) {
-      return;
-    }
-    await deletePatientMutation.mutateAsync(patient.id);
+    setPatientToDelete(patient);
   };
 
   const handleSaveInsurance = async (data) => {
     await saveInsuranceMutation.mutateAsync(data);
+  };
+
+  const handleDeleteInsurance = async (patient, policy) => {
+    setInsuranceToDelete({ patient, policy });
   };
 
   const handleVerifyPatient = (patient) => {
@@ -671,7 +641,11 @@ export default function Patients() {
           ))}
         </div>
 
-        {loading ? (
+        {patientsQuery.isError ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            {patientsQuery.error?.message || "Unable to load patients right now."}
+          </div>
+        ) : loading ? (
           <div className="py-12 text-center text-slate-400">Loading patients...</div>
         ) : filteredPatients.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center shadow-sm">
@@ -697,6 +671,7 @@ export default function Patients() {
                 onEditInsurance={(selectedPatient, policy) =>
                   setInsuranceModal({ patient: selectedPatient, policy })
                 }
+                onDeleteInsurance={handleDeleteInsurance}
                 onVerify={handleVerifyPatient}
                 onStartPriorAuth={handleStartPriorAuth}
               />
@@ -747,12 +722,85 @@ export default function Patients() {
       {insuranceModal ? (
         <InsurancePolicyForm
           policy={insuranceModal.policy}
+          patient={insuranceModal.patient}
           patientId={insuranceModal.patient.id}
           clientId={insuranceModal.patient.clientId || clientId}
           onClose={() => setInsuranceModal(null)}
           onSave={handleSaveInsurance}
         />
       ) : null}
+
+      <AlertDialog
+        open={Boolean(patientToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deletePatientMutation.isPending) {
+            setPatientToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Patient</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete {patientToDelete?.firstName} {patientToDelete?.lastName}? This will remove the
+              patient record and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePatientMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700"
+              disabled={deletePatientMutation.isPending}
+              onClick={async (event) => {
+                event.preventDefault();
+                if (!patientToDelete) return;
+                await deletePatientMutation.mutateAsync(patientToDelete.id);
+              }}
+            >
+              {deletePatientMutation.isPending ? "Deleting..." : "Delete Patient"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(insuranceToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteInsuranceMutation.isPending) {
+            setInsuranceToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Insurance Policy</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete {insuranceToDelete?.policy?.payerName || "this insurance policy"} for{" "}
+              {insuranceToDelete?.patient?.firstName} {insuranceToDelete?.patient?.lastName}? This
+              will remove the policy from the patient record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteInsuranceMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700"
+              disabled={deleteInsuranceMutation.isPending}
+              onClick={async (event) => {
+                event.preventDefault();
+                if (!insuranceToDelete) return;
+                await deleteInsuranceMutation.mutateAsync({
+                  patientId: insuranceToDelete.patient.id,
+                  policyId: insuranceToDelete.policy.id,
+                });
+              }}
+            >
+              {deleteInsuranceMutation.isPending ? "Deleting..." : "Delete Insurance"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </StaffinglyLayout>
   );
 }
