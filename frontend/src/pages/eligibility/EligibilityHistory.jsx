@@ -3,6 +3,8 @@ import { useAuthUserQuery, useEntityFilterQuery, useEntityListQuery } from "@/li
 import StaffinglyLayout from "@/components/staffingly/StaffinglyLayout";
 import ConnectionMethodBadge from "@/components/eligibility/ConnectionMethodBadge";
 import {
+  AlertTriangle,
+  CheckCircle,
   Search,
   Download,
   Eye,
@@ -10,6 +12,8 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import AppSelect from "@/components/ui/app-select";
 
@@ -49,10 +53,328 @@ function wasConvertedToPa(row) {
   }
 }
 
-function HistoryRow({ row, clientName }) {
+function getGatewayResponseMeta(row) {
+  if (!row.rawResponseJson) {
+    return {
+      checkId: null,
+      gatewayPatientId: null,
+      priorAuthRequired: null,
+      submissionType: null,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(row.rawResponseJson);
+    const payload = parsed.response || parsed;
+    const routingHeader = parsed.routing_header || parsed.routingHeader || {};
+
+    return {
+      checkId: payload.checkId || payload.check_id || null,
+      gatewayPatientId:
+        payload.gatewayPatientId || payload.gateway_patient_id || parsed.patient_id || null,
+      priorAuthRequired:
+        payload.priorAuthRequired ??
+        payload.prior_auth_required ??
+        parsed.prior_auth_required ??
+        null,
+      submissionType:
+        routingHeader.submission_type ||
+        routingHeader.submissionType ||
+        parsed.submissionType ||
+        null,
+    };
+  } catch {
+    return {
+      checkId: null,
+      gatewayPatientId: null,
+      priorAuthRequired: null,
+      submissionType: null,
+    };
+  }
+}
+
+function formatRawResult(row) {
+  if (!row.rawResponseJson) {
+    return "No stored gateway response for this verification.";
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(row.rawResponseJson), null, 2);
+  } catch {
+    return row.rawResponseJson;
+  }
+}
+
+function getHumanReadableResult(row) {
+  const flags = (() => {
+    if (!row.flagsJson) return [];
+    try {
+      const parsed = JSON.parse(row.flagsJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const gatewayMeta = getGatewayResponseMeta(row);
+  const coverageStatus = row.coverageStatus || "Unknown";
+  const statusTone = STATUS_STYLE[coverageStatus] || STATUS_STYLE.Unknown;
+
+  const nextSteps = [];
+  if (coverageStatus === "Inactive") {
+    nextSteps.push("Do not schedule until updated insurance is collected from the patient.");
+  } else if (coverageStatus === "Unknown") {
+    nextSteps.push("Escalate for manual follow-up before confirming the visit.");
+  } else {
+    nextSteps.push("Coverage appears active for the requested date of service.");
+  }
+
+  if (gatewayMeta.priorAuthRequired === true) {
+    nextSteps.push("Tell the care team that prior authorization is required before treatment.");
+  }
+
+  if (row.requiresHumanReview) {
+    nextSteps.push(
+      "A staff member should review this verification before finalizing the appointment."
+    );
+  }
+
+  return {
+    flags,
+    gatewayMeta,
+    coverageStatus,
+    statusTone,
+    nextSteps,
+  };
+}
+
+function SummaryField({ label, value }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-slate-700">{value || "—"}</p>
+    </div>
+  );
+}
+
+function escapeCsvValue(value) {
+  if (value == null) return "";
+  const stringValue = String(value);
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function formatCsvDate(value, { includeTime = false } = {}) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  const formatted = includeTime
+    ? date.toLocaleString("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : date.toLocaleDateString("en-CA");
+
+  // Force spreadsheet apps to keep these as text so they do not render as #######.
+  return `="${formatted}"`;
+}
+
+function FullResultModal({ row, clientName, onClose }) {
+  const resultText = formatRawResult(row);
+  const { flags, gatewayMeta, coverageStatus, statusTone, nextSteps } = getHumanReadableResult(row);
+  const StatusIcon =
+    coverageStatus === "Active"
+      ? CheckCircle
+      : coverageStatus === "Inactive"
+        ? AlertTriangle
+        : ShieldCheck;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Eligibility Result
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">
+              {row.subscriberName || "Unknown Patient"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {row.payer || "Unknown payer"} · {clientName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="space-y-5">
+            <div
+              className="rounded-3xl border p-5"
+              style={{ backgroundColor: statusTone.bg, borderColor: statusTone.text }}
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-2xl bg-white/80 p-3">
+                    <StatusIcon className="h-6 w-6" style={{ color: statusTone.text }} />
+                  </div>
+                  <div>
+                    <p
+                      className="text-xs font-semibold uppercase tracking-[0.18em]"
+                      style={{ color: statusTone.text }}
+                    >
+                      Summary
+                    </p>
+                    <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                      Coverage {coverageStatus}
+                    </h3>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-700">
+                      {coverageStatus === "Active"
+                        ? "The patient appears eligible for the requested service date. Review any warnings below before final scheduling."
+                        : coverageStatus === "Inactive"
+                          ? "The patient does not appear eligible on the requested service date. Updated insurance or manual follow-up is needed."
+                          : "The verification could not fully confirm eligibility. A manual review is needed before the visit is finalized."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-900">Verification confidence</p>
+                  <p className="mt-1 text-2xl font-bold" style={{ color: statusTone.text }}>
+                    {row.confidenceScore != null ? `${row.confidenceScore}%` : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[1.2fr,0.8fr]">
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Coverage Details
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <SummaryField label="Member ID" value={row.memberId} />
+                  <SummaryField label="Plan Name" value={row.planName} />
+                  <SummaryField label="Plan Type" value={row.planType} />
+                    <SummaryField label="Network" value={row.networkStatus} />
+                    <SummaryField label="Effective Date" value={row.effectiveDate} />
+                    <SummaryField label="Termination Date" value={row.terminationDate} />
+                    <SummaryField label="Service Date" value={row.serviceDate} />
+                    <SummaryField
+                      label="Prior Auth Required"
+                      value={
+                        gatewayMeta.priorAuthRequired == null
+                          ? "Not specified"
+                          : gatewayMeta.priorAuthRequired
+                            ? "Yes"
+                            : "No"
+                      }
+                    />
+                    <SummaryField label="Connection Method" value={row.channelUsed} />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Recommended Next Steps
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {nextSteps.map((step) => (
+                      <div
+                        key={step}
+                        className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3"
+                      >
+                        <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#0a7e87]" />
+                        <p className="text-sm text-slate-700">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {flags.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                      Important Notes
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      {flags.map((flag) => (
+                        <div key={flag} className="flex items-start gap-3">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+                          <p className="text-sm text-amber-900">{flag}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Verification Record
+                  </p>
+                  <div className="mt-4 space-y-3 text-sm text-slate-700">
+                    <p>
+                      <span className="font-semibold">History ID:</span> {row.id}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Check ID:</span> {gatewayMeta.checkId || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Gateway Patient ID:</span>{" "}
+                      {gatewayMeta.gatewayPatientId || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Submission Type:</span>{" "}
+                      {gatewayMeta.submissionType || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Verified By:</span> {row.verifiedBy || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Created:</span>{" "}
+                      {formatHistoryDate(row.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Stored Gateway Response
+                  </p>
+                  <pre className="mt-3 max-h-[40vh] overflow-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+                    <code>{resultText}</code>
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryRow({ row, clientName, onViewFullResult }) {
   const [expanded, setExpanded] = useState(false);
   const st = STATUS_STYLE[row.coverageStatus] || STATUS_STYLE.Unknown;
   const convertedToPa = wasConvertedToPa(row);
+  const gatewayMeta = getGatewayResponseMeta(row);
 
   return (
     <>
@@ -88,7 +410,7 @@ function HistoryRow({ row, clientName }) {
         <td className="px-4 py-3">
           {convertedToPa ? (
             <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
-              → PA Case
+              PA Case
             </span>
           ) : (
             <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
@@ -119,6 +441,13 @@ function HistoryRow({ row, clientName }) {
                 <span className="font-semibold text-slate-700">{clientName}</span>
               </div>
               <div>
+                <span className="text-slate-400">Gateway Patient ID</span>
+                <br />
+                <span className="font-mono font-semibold text-slate-700">
+                  {gatewayMeta.gatewayPatientId || "—"}
+                </span>
+              </div>
+              <div>
                 <span className="text-slate-400">AI Confidence</span>
                 <br />
                 <span
@@ -129,11 +458,50 @@ function HistoryRow({ row, clientName }) {
                   {row.confidenceScore != null ? "%" : ""}
                 </span>
               </div>
+              <div>
+                <span className="text-slate-400">Check ID</span>
+                <br />
+                <span className="font-mono font-semibold text-slate-700">
+                  {gatewayMeta.checkId || "—"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Submission Type</span>
+                <br />
+                <span className="font-semibold text-slate-700">
+                  {gatewayMeta.submissionType || "—"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Service Date</span>
+                <br />
+                <span className="font-semibold text-slate-700">{row.serviceDate || "—"}</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Prior Auth Required</span>
+                <br />
+                <span className="font-semibold text-slate-700">
+                  {gatewayMeta.priorAuthRequired == null
+                    ? "—"
+                    : gatewayMeta.priorAuthRequired
+                      ? "Yes"
+                      : "No"}
+                </span>
+              </div>
               <div className="flex items-end gap-2">
-                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onViewFullResult(row);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white"
+                >
                   <Eye className="w-3 h-3" /> View Full Result
                 </button>
                 <button
+                  type="button"
+                  onClick={(event) => event.stopPropagation()}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-xs font-semibold"
                   style={{ backgroundColor: "#293682" }}
                 >
@@ -148,86 +516,19 @@ function HistoryRow({ row, clientName }) {
   );
 }
 
-const MOCK_HISTORY = [
-  {
-    id: "elig-history-03891",
-    subscriberName: "Sarah J. Mitchell",
-    payer: "UnitedHealthcare",
-    coverageStatus: "Active",
-    channelUsed: "Availity",
-    responseTimeSeconds: 3.2,
-    verifiedBy: "Dana Kim",
-    createdAt: "2026-03-01T09:14:00Z",
-    memberId: "UHC-884720193",
-    confidenceScore: 94,
-    flagsJson: "[]",
-  },
-  {
-    id: "elig-history-03890",
-    subscriberName: "James R. Holloway",
-    payer: "Aetna",
-    coverageStatus: "Active",
-    channelUsed: "Direct Payer API",
-    responseTimeSeconds: 1.8,
-    verifiedBy: "Drew Okafor",
-    createdAt: "2026-03-01T08:55:00Z",
-    memberId: "AETNA-562901847",
-    confidenceScore: 91,
-    flagsJson: '["Converted to prior authorization case"]',
-  },
-  {
-    id: "elig-history-03889",
-    subscriberName: "Robert T. Sanchez",
-    payer: "Medicaid",
-    coverageStatus: "Unknown",
-    channelUsed: "Availity",
-    responseTimeSeconds: 4.1,
-    verifiedBy: "Sam Torres",
-    createdAt: "2026-03-01T08:30:00Z",
-    memberId: "MCD-112984732",
-    confidenceScore: 58,
-    flagsJson: '["Eligibility could not be fully confirmed"]',
-  },
-  {
-    id: "elig-history-03888",
-    subscriberName: "Linda K. Patel",
-    payer: "BCBS",
-    coverageStatus: "Active",
-    channelUsed: "EMR Integration",
-    responseTimeSeconds: 0.95,
-    verifiedBy: "Priya Mehta",
-    createdAt: "2026-03-01T08:10:00Z",
-    memberId: "BCBS-774930281",
-    confidenceScore: 88,
-    flagsJson: "[]",
-  },
-  {
-    id: "elig-history-03887",
-    subscriberName: "Marcus A. Thompson",
-    payer: "Medicare",
-    coverageStatus: "Active",
-    channelUsed: "Availity",
-    responseTimeSeconds: 2.9,
-    verifiedBy: "Dana Kim",
-    createdAt: "2026-02-28T17:45:00Z",
-    memberId: "MBI-4EG9-UA8-YK72",
-    confidenceScore: 96,
-    flagsJson: '["Converted to prior authorization case"]',
-  },
-];
-
 export default function EligibilityHistory() {
   const { data: user } = useAuthUserQuery({ withDefaultRole: "staffingly_supervisor" });
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMethod, setFilterMethod] = useState("all");
+  const [selectedResult, setSelectedResult] = useState(null);
   const {
     data: historyRaw = [],
     isLoading: loadingHistory,
     isError: historyError,
   } = useEntityFilterQuery("EligibilityHistory", {}, { sortBy: "-createdAt", limit: 100 });
 
-  const history = historyRaw.length > 0 ? historyRaw : MOCK_HISTORY;
+  const history = historyRaw;
 
   const { data: clients = [] } = useEntityListQuery("Client", { limit: 100 }, null, {
     staleTime: 5 * 60 * 1000,
@@ -248,6 +549,72 @@ export default function EligibilityHistory() {
     return matchSearch && matchStatus && matchMethod;
   });
 
+  const handleExportCsv = () => {
+    const headers = [
+      "History ID",
+      "Patient",
+      "Payer",
+      "Member ID",
+      "Coverage Status",
+      "Plan Name",
+      "Plan Type",
+      "Network Status",
+      "Service Date",
+      "Effective Date",
+      "Termination Date",
+      "Prior Auth Required",
+      "Confidence Score",
+      "Connection Method",
+      "Response Time Seconds",
+      "Verified By",
+      "Created At",
+      "Client",
+    ];
+
+    const rows = filtered.map((row) => {
+      const gatewayMeta = getGatewayResponseMeta(row);
+      return [
+        row.id,
+        row.subscriberName || "",
+        row.payer || "",
+        row.memberId || "",
+        row.coverageStatus || "",
+        row.planName || "",
+        row.planType || "",
+        row.networkStatus || "",
+        formatCsvDate(row.serviceDate),
+        formatCsvDate(row.effectiveDate),
+        formatCsvDate(row.terminationDate),
+        gatewayMeta.priorAuthRequired == null
+          ? ""
+          : gatewayMeta.priorAuthRequired
+            ? "Yes"
+            : "No",
+        row.confidenceScore ?? "",
+        row.channelUsed || "",
+        row.responseTimeSeconds ?? "",
+        row.verifiedBy || "",
+        formatCsvDate(row.createdAt, { includeTime: true }),
+        clientNames[row.clientId] || row.clientId || "",
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => escapeCsvValue(value)).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `eligibility-history-${dateStamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <StaffinglyLayout
       user={user}
@@ -255,6 +622,14 @@ export default function EligibilityHistory() {
       title="Eligibility History"
       breadcrumbs={["Eligibility", "History"]}
     >
+      {selectedResult ? (
+        <FullResultModal
+          row={selectedResult}
+          clientName={clientNames[selectedResult.clientId] || selectedResult.clientId || "—"}
+          onClose={() => setSelectedResult(null)}
+        />
+      ) : null}
+
       <div className="space-y-5 max-w-[1400px] mx-auto">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -303,7 +678,11 @@ export default function EligibilityHistory() {
               triggerClassName="h-9 w-[180px] rounded-xl text-xs"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
+          >
             <Download className="w-3.5 h-3.5" /> Export CSV
           </button>
         </div>
@@ -322,7 +701,7 @@ export default function EligibilityHistory() {
                     "Connection Method",
                     "Specialist",
                     "Date",
-                    "Billing Type",
+                    "Workflow Type",
                     "",
                   ].map((h) => (
                     <th
@@ -365,6 +744,7 @@ export default function EligibilityHistory() {
                       key={row.id}
                       row={row}
                       clientName={clientNames[row.clientId] || row.clientId || "—"}
+                      onViewFullResult={setSelectedResult}
                     />
                   ))}
               </tbody>
