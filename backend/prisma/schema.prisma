@@ -25,14 +25,35 @@ model User {
   lastLoginAt          DateTime?
   active               Boolean   @default(true)
   accountLocked        Boolean   @default(false)
+  allowedIpAddresses   String[]  @default([])
   registeredDevices    Json?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  sessions          UserSession[]
   auditLogs         AuditLog[]
   notifications     Notification[]
   priorAuthCases    PriorAuthCase[]    @relation("AssignedSpecialist")
   eligibilityChecks EligibilityCheck[]
+}
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId    String
+  deviceLabel String
+  ipAddress   String?
+  userAgent   String?
+  lastSeenAt  DateTime @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([revokedAt])
 }
 
 enum UserRole {

@@ -77,6 +77,17 @@ function formatDateTime(value) {
   });
 }
 
+function formatAllowedIpAddresses(value) {
+  if (!Array.isArray(value) || value.length === 0) return "";
+  return value.join("\n");
+}
+
+function parseAllowedIpAddresses(value) {
+  if (!value) return [];
+
+  return [...new Set(value.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean))];
+}
+
 function normalizeUser(user) {
   const [first_name = "", ...lastParts] = (user.name || "").split(" ");
   const last_name = lastParts.join(" ");
@@ -91,6 +102,7 @@ function normalizeUser(user) {
     active: typeof user.active === "boolean" ? user.active : null,
     last_login: formatDateTime(user.lastLoginAt),
     account_locked: typeof user.accountLocked === "boolean" ? user.accountLocked : null,
+    allowed_ip_addresses: Array.isArray(user.allowedIpAddresses) ? user.allowedIpAddresses : [],
     client_name: user.client?.name || "",
     registered_devices: Array.isArray(user.registeredDevices) ? user.registeredDevices : [],
     raw: user,
@@ -107,6 +119,8 @@ function UserDrawer({ user, onClose, onSave, saveError, saving }) {
       role: "staffingly_specialist",
       active: true,
       account_locked: false,
+      allowed_ip_addresses: [],
+      allowed_ip_addresses_text: "",
       payroll_rate: "",
       payroll_cycle: "monthly",
     }
@@ -310,10 +324,24 @@ function UserDrawer({ user, onClose, onSave, saveError, saving }) {
                 </label>
                 <textarea
                   rows={4}
-                  disabled
-                  placeholder="IP restriction coming soon..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2.5 font-mono text-sm text-slate-400 focus:outline-none cursor-not-allowed"
+                  value={
+                    form.allowed_ip_addresses_text ??
+                    formatAllowedIpAddresses(form.allowed_ip_addresses)
+                  }
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      allowed_ip_addresses_text: event.target.value,
+                    }))
+                  }
+                  placeholder={`One IP or CIDR per line
+203.0.113.14
+198.51.100.0/24`}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm text-slate-700 focus:border-slate-300 focus:outline-none"
                 />
+                <p className="mt-2 text-xs text-slate-500">
+                  Leave blank to allow login from any network. Supports exact IPs and CIDR ranges.
+                </p>
               </div>
             </div>
           </section>
@@ -365,7 +393,7 @@ function DevicesModal({ user, onClose, onRevoke, revoking }) {
               </div>
               <button
                 type="button"
-                onClick={() => onRevoke(i)}
+                onClick={() => onRevoke({ device: d, deviceIndex: i })}
                 disabled={revoking}
                 className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -411,6 +439,9 @@ export default function SAUsers() {
         clientId: form.clientId ?? (drawer && drawer !== "add" ? drawer.clientId : null),
         active: form.active,
         accountLocked: form.account_locked,
+        allowedIpAddresses: parseAllowedIpAddresses(
+          form.allowed_ip_addresses_text ?? formatAllowedIpAddresses(form.allowed_ip_addresses)
+        ),
       };
 
       if (drawer && drawer !== "add") {
@@ -433,16 +464,16 @@ export default function SAUsers() {
     },
   });
   const revokeDeviceMutation = useMutation({
-    /** @param {number} deviceIndex */
-    mutationFn: (deviceIndex) => {
+    /** @param {{ device: any, deviceIndex: number }} params */
+    mutationFn: ({ device }) => {
       if (!devicesModal) return Promise.reject(new Error("No user selected"));
-      const updatedDevices = [...(devicesModal.registered_devices || [])];
-      updatedDevices.splice(deviceIndex, 1);
-      return api.entities.User.update(devicesModal.id, {
-        registeredDevices: updatedDevices,
+      return api.client.post(`/api/users/${devicesModal.id}/revoke-device`, {
+        deviceId: device.deviceId || null,
+        label: device.label || null,
+        ipAddress: device.ipAddress || null,
       });
     },
-    onSuccess: async (_, deviceIndex) => {
+    onSuccess: async (_, { deviceIndex }) => {
       // Update the local modal state so the UI reflects the change immediately
       if (devicesModal) {
         const updatedDevices = [...(devicesModal.registered_devices || [])];
@@ -497,7 +528,7 @@ export default function SAUsers() {
         <DevicesModal
           user={devicesModal}
           onClose={() => setDevicesModal(null)}
-          onRevoke={(idx) => revokeDeviceMutation.mutate(idx)}
+          onRevoke={(payload) => revokeDeviceMutation.mutate(payload)}
           revoking={revokeDeviceMutation.isPending}
         />
       )}

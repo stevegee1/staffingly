@@ -1,6 +1,7 @@
 import type { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
+import { getIpRestrictionError } from "../lib/ipSecurity.js";
 import type { AuthenticatedRequest, JwtPayload } from "../types/index.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -52,11 +53,47 @@ export const authenticate = async (
       return;
     }
 
+    if (!decoded.sessionId) {
+      res.status(401).json({ error: "Your session is no longer valid. Please sign in again." });
+      return;
+    }
+
+    if (user.active === false) {
+      res.status(403).json({ error: "Your account has been deactivated. Contact an administrator." });
+      return;
+    }
+
+    if (user.accountLocked) {
+      res.status(403).json({ error: "Your account has been locked. Contact an administrator." });
+      return;
+    }
+
+    const ipRestrictionError = getIpRestrictionError(req, user.allowedIpAddresses);
+    if (ipRestrictionError) {
+      res.status(403).json({ error: ipRestrictionError });
+      return;
+    }
+
+    const session = await prisma.userSession.findUnique({
+      where: { id: decoded.sessionId },
+    });
+
+    if (!session || session.userId !== user.id || session.revokedAt) {
+      res.status(401).json({ error: "Your session has been revoked. Please sign in again." });
+      return;
+    }
+
+    if (session.expiresAt && session.expiresAt <= new Date()) {
+      res.status(401).json({ error: "Your session has expired. Please sign in again." });
+      return;
+    }
+
     req.user = {
       userId: user.id,
       email: user.email,
       role: user.role,
       clientId: user.clientId,
+      sessionId: session.id,
     };
 
     next();
@@ -146,6 +183,7 @@ export const authenticateCron = (
     email: "system@staffverify.com",
     role: "SUPER_ADMIN",
     clientId: null,
+    sessionId: null,
   };
   next();
 };

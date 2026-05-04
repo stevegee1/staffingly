@@ -6,6 +6,7 @@ export interface AuthenticatedUser {
   email: string;
   role: string;
   clientId: string | null;
+  sessionId: string | null;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -42,4 +43,5 @@ export interface JwtPayload {
   email: string;
   role: string;
   clientId: string | null;
+  sessionId: string;
 }

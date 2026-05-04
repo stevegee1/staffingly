@@ -3,6 +3,13 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import prisma from "../lib/prisma.js";
+import {
+  getRequestDeviceId,
+  parseJwtExpiry,
+  toRegisteredDevicesJson,
+  upsertRegisteredDevice,
+} from "../lib/deviceSessions.js";
+import { getIpRestrictionError, getRequestIp } from "../lib/ipSecurity.js";
 import { sendPasswordResetEmail } from "../services/emailService.js";
 import type {
   AuthenticatedRequest,
@@ -89,12 +96,43 @@ export const register = async (
     },
   });
 
+  const registrationIp = getRequestIp(req);
+  const registrationUserAgentHeader = req.headers["user-agent"];
+  const registrationUserAgent = Array.isArray(registrationUserAgentHeader)
+    ? registrationUserAgentHeader[0]
+    : registrationUserAgentHeader;
+  const deviceId = getRequestDeviceId(req);
+  const session = await prisma.userSession.create({
+    data: {
+      userId: user.id,
+      deviceId,
+      deviceLabel: registrationUserAgent || "Unknown device",
+      ipAddress: registrationIp,
+      userAgent: registrationUserAgent,
+      expiresAt: parseJwtExpiry(JWT_EXPIRES_IN),
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      registeredDevices: toRegisteredDevicesJson(
+        upsertRegisteredDevice(user.registeredDevices, {
+          deviceId,
+          userAgent: registrationUserAgent,
+          ipAddress: registrationIp,
+        })
+      ),
+    },
+  });
+
   // Generate JWT token
   const payload: JwtPayload = {
     userId: user.id,
     email: user.email,
     role: user.role,
     clientId: user.clientId,
+    sessionId: session.id,
   };
 
   const token = jwt.sign(payload, JWT_SECRET, {
@@ -144,6 +182,31 @@ export const login = async (
     return;
   }
 
+  if (user.active === false) {
+    res.status(403).json({
+      success: false,
+      message: "Your account has been deactivated. Contact an administrator.",
+    });
+    return;
+  }
+
+  if (user.accountLocked) {
+    res.status(403).json({
+      success: false,
+      message: "Your account has been locked. Contact an administrator.",
+    });
+    return;
+  }
+
+  const ipRestrictionError = getIpRestrictionError(req, user.allowedIpAddresses);
+  if (ipRestrictionError) {
+    res.status(403).json({
+      success: false,
+      message: ipRestrictionError,
+    });
+    return;
+  }
+
   // Users without passwords cannot sign in through the UI.
   if (!user.passwordHash) {
     res.status(401).json({
@@ -168,10 +231,42 @@ export const login = async (
     email: user.email,
     role: user.role,
     clientId: user.clientId,
+    sessionId: "",
   };
+  const loginIp = getRequestIp(req);
+  const userAgent = req.headers["user-agent"];
+  const normalizedUserAgent = Array.isArray(userAgent) ? userAgent[0] : userAgent;
+  const deviceId = getRequestDeviceId(req);
+
+  const session = await prisma.userSession.create({
+    data: {
+      userId: user.id,
+      deviceId,
+      deviceLabel: normalizedUserAgent || "Unknown device",
+      ipAddress: loginIp,
+      userAgent: normalizedUserAgent,
+      expiresAt: parseJwtExpiry(JWT_EXPIRES_IN),
+    },
+  });
+
+  payload.sessionId = session.id;
 
   const token = jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
+  });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastLoginAt: new Date(),
+      registeredDevices: toRegisteredDevicesJson(
+        upsertRegisteredDevice(user.registeredDevices, {
+          deviceId,
+          userAgent: normalizedUserAgent,
+          ipAddress: loginIp,
+        })
+      ),
+    },
   });
 
   res.json({
@@ -229,11 +324,21 @@ export const me = async (
 };
 
 export const logout = async (
-  _req: AuthenticatedRequest,
+  req: AuthenticatedRequest,
   res: Response<ApiResponse>
 ): Promise<void> => {
-  // With JWT, logout is handled client-side by removing the token
-  // Optionally implement token blacklisting here
+  if (req.user?.sessionId) {
+    await prisma.userSession.updateMany({
+      where: {
+        id: req.user.sessionId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   res.json({
     success: true,
     message: "Logged out successfully",

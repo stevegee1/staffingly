@@ -3,7 +3,12 @@ import * as userController from "../controllers/userController.js";
 import { authenticate, requireRoles } from "../middleware/auth.js";
 import { validateBody, validateQuery } from "../middleware/validate.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
-import { createUserSchema, updateUserSchema, paginationSchema } from "../lib/schemas.js";
+import {
+  createUserSchema,
+  updateUserSchema,
+  paginationSchema,
+  revokeUserDeviceSchema,
+} from "../lib/schemas.js";
 
 const router = Router();
 const ADMIN_ROLES = ["SUPER_ADMIN", "STAFFINGLY_ADMIN"];
@@ -31,6 +36,13 @@ router.put(
   requireRoles(...ADMIN_ROLES),
   validateBody(updateUserSchema),
   asyncHandler(userController.updateUser)
+);
+
+router.post(
+  "/:id/revoke-device",
+  requireRoles(...ADMIN_ROLES),
+  validateBody(revokeUserDeviceSchema),
+  asyncHandler(userController.revokeUserDevice)
 );
 
 router.delete("/:id", requireRoles("SUPER_ADMIN"), asyncHandler(userController.deleteUser));

@@ -1,4 +1,4 @@
-import { getToken, setToken } from "@/lib/utils/auth";
+import { getDeviceId, getToken, setToken } from "@/lib/utils/auth";
 
 /**
  * Core HTTP client for frontend API access.
@@ -52,6 +52,7 @@ class ApiClient {
 
     const headers = new Headers(options.headers);
     headers.set("Content-Type", "application/json");
+    headers.set("X-Device-Id", getDeviceId());
 
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
@@ -162,6 +163,7 @@ class ApiClient {
     const token = this.getToken();
 
     const headers = new Headers();
+    headers.set("X-Device-Id", getDeviceId());
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }

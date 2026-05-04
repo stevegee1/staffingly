@@ -35,6 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set("trust proxy", true);
 
 // CORS configuration - allow frontend origins
 const allowedOrigins = process.env.CORS_ORIGIN

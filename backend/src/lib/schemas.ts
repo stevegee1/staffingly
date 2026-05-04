@@ -252,6 +252,8 @@ export const createUserSchema = Joi.object({
   clientId: Joi.string().allow("", null),
   active: Joi.boolean().default(true),
   accountLocked: Joi.boolean().default(false),
+  allowedIpAddresses: Joi.array().items(Joi.string().trim()).default([]),
+  registeredDevices: Joi.array().items(Joi.object().unknown(true)).default([]),
 });
 
 export const updateUserSchema = Joi.object({
@@ -268,7 +270,15 @@ export const updateUserSchema = Joi.object({
   clientId: Joi.string().allow("", null),
   active: Joi.boolean(),
   accountLocked: Joi.boolean(),
+  allowedIpAddresses: Joi.array().items(Joi.string().trim()),
+  registeredDevices: Joi.array().items(Joi.object().unknown(true)),
 });
+
+export const revokeUserDeviceSchema = Joi.object({
+  deviceId: Joi.string().allow("", null),
+  label: Joi.string().allow("", null),
+  ipAddress: Joi.string().allow("", null),
+}).or("deviceId", "label", "ipAddress");
 
 export const createPayerRuleSchema = Joi.object({
   payerName: Joi.string().required(),

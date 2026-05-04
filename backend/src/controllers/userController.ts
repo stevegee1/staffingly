@@ -1,5 +1,13 @@
 import type { Response } from "express";
 import prisma from "../lib/prisma.js";
+import {
+  matchesDevice,
+  normalizeRegisteredDevices,
+  removeRegisteredDevice,
+  toRegisteredDevicesJson,
+  type DeviceTarget,
+} from "../lib/deviceSessions.js";
+import { sanitizeAllowedIpAddresses } from "../lib/ipSecurity.js";
 import type { AuthenticatedRequest } from "../types/index.js";
 
 export const getUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -59,7 +67,16 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
 };
 
 export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { email, name, role, clientId, active, accountLocked } = req.body;
+  const {
+    email,
+    name,
+    role,
+    clientId,
+    active,
+    accountLocked,
+    allowedIpAddresses,
+    registeredDevices,
+  } = req.body;
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -81,6 +98,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
       clientId,
       ...(active !== undefined && { active }),
       ...(accountLocked !== undefined && { accountLocked }),
+      allowedIpAddresses: sanitizeAllowedIpAddresses(allowedIpAddresses),
+      ...(registeredDevices !== undefined && { registeredDevices }),
     },
     include: {
       client: true,
@@ -95,21 +114,89 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
 
 export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
-  const { email, name, role, clientId, active, accountLocked } = req.body;
+  const {
+    email,
+    name,
+    role,
+    clientId,
+    active,
+    accountLocked,
+    allowedIpAddresses,
+    registeredDevices,
+  } = req.body;
 
-  const user = await prisma.user.update({
+  const existingUser = await prisma.user.findUnique({
     where: { id },
-    data: {
-      email,
-      name,
-      role,
-      clientId,
-      ...(active !== undefined && { active }),
-      ...(accountLocked !== undefined && { accountLocked }),
-    },
-    include: {
-      client: true,
-    },
+  });
+
+  if (!existingUser) {
+    res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+    return;
+  }
+
+  const previousDevices = normalizeRegisteredDevices(existingUser.registeredDevices);
+  const nextDevices =
+    registeredDevices !== undefined
+      ? normalizeRegisteredDevices(registeredDevices)
+      : previousDevices;
+  const removedDevices =
+    registeredDevices !== undefined
+      ? previousDevices.filter(
+          (device) => !nextDevices.some((nextDevice) => nextDevice.deviceId === device.deviceId)
+        )
+      : [];
+
+  const shouldRevokeAllSessions = active === false || accountLocked === true;
+
+  const user = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: { id },
+      data: {
+        email,
+        name,
+        role,
+        clientId,
+        ...(active !== undefined && { active }),
+        ...(accountLocked !== undefined && { accountLocked }),
+        ...(allowedIpAddresses !== undefined && {
+          allowedIpAddresses: sanitizeAllowedIpAddresses(allowedIpAddresses),
+        }),
+        ...(registeredDevices !== undefined && {
+          registeredDevices: toRegisteredDevicesJson(nextDevices),
+        }),
+      },
+      include: {
+        client: true,
+      },
+    });
+
+    if (shouldRevokeAllSessions) {
+      await tx.userSession.updateMany({
+        where: {
+          userId: id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      });
+    } else if (removedDevices.length > 0) {
+      await tx.userSession.updateMany({
+        where: {
+          userId: id,
+          revokedAt: null,
+          OR: removedDevices.map((device) => ({ deviceId: device.deviceId })),
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      });
+    }
+
+    return updatedUser;
   });
 
   res.json({
@@ -128,5 +215,77 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
   res.json({
     success: true,
     message: "User deleted successfully",
+  });
+};
+
+export const revokeUserDevice = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params as { id: string };
+  const { deviceId, label, ipAddress } = req.body as DeviceTarget;
+
+  const target: DeviceTarget = {
+    deviceId: deviceId || null,
+    label: label || null,
+    ipAddress: ipAddress || null,
+  };
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!user) {
+    res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+    return;
+  }
+
+  const existingDevices = normalizeRegisteredDevices(user.registeredDevices);
+  const matchedDevice = existingDevices.find((device) => matchesDevice(device, target));
+
+  if (!matchedDevice) {
+    res.status(404).json({
+      success: false,
+      message: "Device not found",
+    });
+    return;
+  }
+
+  const { devices } = removeRegisteredDevice(user.registeredDevices, {
+    deviceId: matchedDevice.deviceId,
+    label: matchedDevice.label,
+    ipAddress: matchedDevice.ipAddress,
+  });
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id },
+      data: {
+        registeredDevices: toRegisteredDevicesJson(devices),
+      },
+    }),
+    prisma.userSession.updateMany({
+      where: {
+        userId: id,
+        revokedAt: null,
+        OR: [
+          { deviceId: matchedDevice.deviceId },
+          ...(matchedDevice.ipAddress
+            ? [{ deviceLabel: matchedDevice.label, ipAddress: matchedDevice.ipAddress }]
+            : [{ deviceLabel: matchedDevice.label }]),
+        ],
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    message: "Device revoked successfully",
   });
 };
