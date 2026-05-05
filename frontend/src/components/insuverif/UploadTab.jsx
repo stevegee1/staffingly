@@ -169,7 +169,7 @@ const CONFIDENCE_FIELD_MAP = {
   subscriber_dob: "subscriberDob",
 };
 
-export default function UploadTab({ onSubmit }) {
+export default function UploadTab({ onSubmit, clientId = "" }) {
   const [documents, setDocuments] = useState([createDocument()]);
   const [extracting, setExtracting] = useState(false);
   const [editedData, setEditedData] = useState({});
@@ -537,7 +537,12 @@ export default function UploadTab({ onSubmit }) {
       {showForm ? (
         <div className="mt-4">
           <h3 className="mb-4 text-sm font-bold text-slate-700">Complete Remaining Fields</h3>
-          <ManualEntryTab onSubmit={onSubmit} prefill={editedData} />
+          <ManualEntryTab
+            onSubmit={onSubmit}
+            prefill={editedData}
+            clientId={clientId}
+            showPatientSelector={false}
+          />
         </div>
       ) : null}
     </div>

@@ -155,11 +155,17 @@ const inputClass =
 /** @type {any} */
 const ringStyle = { "--tw-ring-color": "#293682" };
 
-export default function ManualEntryTab({ onSubmit, prefill = {}, submitting = false }) {
+export default function ManualEntryTab({
+  onSubmit,
+  prefill = {},
+  submitting = false,
+  clientId = "",
+  showPatientSelector = true,
+}) {
   const { data: payerRules = [] } = useEntityListQuery("PayerRule", { limit: 100 }, null);
   const { data: patientsResponse } = useQuery({
-    queryKey: ["patients", "manual-entry-selector"],
-    queryFn: () => api.patients.list({ page: 1, limit: 100 }),
+    queryKey: ["patients", "manual-entry-selector", clientId],
+    queryFn: () => api.patients.list({ page: 1, limit: 100, clientId: clientId || undefined }),
   });
   const [form, setForm] = useState({
     patient_id: prefill.patient_id || "",
@@ -228,23 +234,25 @@ export default function ManualEntryTab({ onSubmit, prefill = {}, submitting = fa
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Section title="Select Existing Patient">
-        <div className="grid grid-cols-1 gap-4">
-          <FormInput label="Patient">
-            <AppSelect
-              value={form.patient_id}
-              onValueChange={(value) => {
-                const selectedPatient = patients.find((patient) => patient.id === value);
-                if (!selectedPatient) return;
-                setForm((current) => buildFormFromPatient(selectedPatient, current));
-              }}
-              options={patientOptions}
-              placeholder="Choose an existing patient to auto-fill"
-              triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
-            />
-          </FormInput>
-        </div>
-      </Section>
+      {showPatientSelector ? (
+        <Section title="Select Existing Patient">
+          <div className="grid grid-cols-1 gap-4">
+            <FormInput label="Patient">
+              <AppSelect
+                value={form.patient_id}
+                onValueChange={(value) => {
+                  const selectedPatient = patients.find((patient) => patient.id === value);
+                  if (!selectedPatient) return;
+                  setForm((current) => buildFormFromPatient(selectedPatient, current));
+                }}
+                options={patientOptions}
+                placeholder="Choose an existing patient to auto-fill"
+                triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+              />
+            </FormInput>
+          </div>
+        </Section>
+      ) : null}
 
       {/* Patient Info */}
       <Section title="Patient Information">

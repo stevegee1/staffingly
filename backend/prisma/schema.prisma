@@ -80,6 +80,7 @@ model Client {
   npi          String?
   taxId        String?
   emrSystem    String?
+  emrConfigJson String? @db.Text
   cloudStorageType String?
   subdomain    String?
   verificationTriggers String? @db.Text

@@ -27,12 +27,20 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "border bg-background text-foreground",
+        success:
+          "success border-emerald-200 bg-emerald-50 text-emerald-950",
+        info:
+          "info border-sky-200 bg-sky-50 text-sky-950",
+        warning:
+          "warning border-amber-200 bg-amber-50 text-amber-950",
+        error:
+          "error border-red-200 bg-red-50 text-red-950",
         destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+          "destructive error border-red-200 bg-red-50 text-red-950",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "info",
     },
   }
 );
@@ -47,6 +55,10 @@ const ToastAction = React.forwardRef(({ className, ...props }, ref) => (
     ref={ref}
     className={cn(
       "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive",
+      "group-[.success]:border-emerald-200 group-[.success]:hover:bg-emerald-100 group-[.success]:hover:text-emerald-900 group-[.success]:focus:ring-emerald-300",
+      "group-[.info]:border-sky-200 group-[.info]:hover:bg-sky-100 group-[.info]:hover:text-sky-900 group-[.info]:focus:ring-sky-300",
+      "group-[.warning]:border-amber-200 group-[.warning]:hover:bg-amber-100 group-[.warning]:hover:text-amber-900 group-[.warning]:focus:ring-amber-300",
+      "group-[.error]:border-red-200 group-[.error]:hover:bg-red-100 group-[.error]:hover:text-red-900 group-[.error]:focus:ring-red-300",
       className
     )}
     {...props}
@@ -59,6 +71,10 @@ const ToastClose = React.forwardRef(({ className, ...props }, ref) => (
     ref={ref}
     className={cn(
       "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600",
+      "group-[.success]:text-emerald-500 group-[.success]:hover:text-emerald-700 group-[.success]:focus:ring-emerald-300",
+      "group-[.info]:text-sky-500 group-[.info]:hover:text-sky-700 group-[.info]:focus:ring-sky-300",
+      "group-[.warning]:text-amber-500 group-[.warning]:hover:text-amber-700 group-[.warning]:focus:ring-amber-300",
+      "group-[.error]:text-red-500 group-[.error]:hover:text-red-700 group-[.error]:focus:ring-red-300",
       className
     )}
     toast-close=""

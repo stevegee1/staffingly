@@ -207,18 +207,20 @@ function PackageForm({ initial, onSave, onCancel }) {
       } else {
         await api.entities.PricingPackage.create(form);
       }
-      toast({
-        title: form.id ? "Package updated" : "Package created",
-        description: `${form.name} is ready to use.`,
-      });
+        toast({
+          title: form.id ? "Package updated" : "Package created",
+          description: `${form.name} is ready to use.`,
+          variant: "success",
+        });
       onSave();
     } catch (error) {
       const message = error?.response?.data?.message || error?.message || "Please try again.";
       setSaveError(message);
-      toast({
-        title: "Unable to save package",
-        description: message,
-      });
+        toast({
+          title: "Unable to save package",
+          description: message,
+          variant: "error",
+        });
     } finally {
       setSaving(false);
     }

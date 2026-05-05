@@ -58,6 +58,20 @@ const eligibility = {
   getBatch: (id) => apiClient.get(`/api/eligibility/batch/${id}`),
 };
 
+const emr = {
+  listSystems: (params = {}) => apiClient.get("/api/eligibility/emr-systems", params),
+  connectSystem: (systemId, data = {}) =>
+    apiClient.post(`/api/eligibility/emr-systems/${systemId}/connect`, data),
+  getSystemConfig: (systemId, params = {}) =>
+    apiClient.get(`/api/eligibility/emr-systems/${systemId}/config`, params),
+  saveSystemConfig: (systemId, data = {}) =>
+    apiClient.post(`/api/eligibility/emr-systems/${systemId}/config`, data),
+  searchPatients: (systemId, params = {}) =>
+    apiClient.get(`/api/eligibility/emr-systems/${systemId}/patients`, params),
+  getPatient: (systemId, patientId, params = {}) =>
+    apiClient.get(`/api/eligibility/emr-systems/${systemId}/patients/${patientId}`, params),
+};
+
 // Upload API (insurance cards)
 const upload = {
   // Upload insurance card image
@@ -87,6 +101,7 @@ export const api = {
   client: apiClient,
   patients,
   eligibility,
+  emr,
   priorAuth,
   upload,
 };

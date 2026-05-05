@@ -27,6 +27,7 @@ const ENTITY_ENDPOINTS = {
   EligibilityCheck: "/api/eligibility",
   Subscriber: "/api/subscribers",
   Provider: "/api/providers",
+  EhrSystem: "/api/eligibility/emr-systems",
 
   // Prior Auth
   PriorAuthCase: "/api/prior-auth/cases",

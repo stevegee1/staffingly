@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Brain,
   CheckCircle,
+  ChevronDown,
+  ChevronRight,
   Download,
   Loader2,
   Play,
@@ -243,7 +245,13 @@ function RowSection({ title, children }) {
 
 function BulkRowCard({ row, index, status, onUpdate, onRemove }) {
   const issues = validateRow(row);
+  const [collapsed, setCollapsed] = useState(false);
   const patientName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
+  const summaryBits = [
+    row.dob ? `DOB ${row.dob}` : null,
+    row.payer || row.payer_id ? row.payer || row.payer_id : null,
+    row.member_id ? `Member ${row.member_id}` : null,
+  ].filter(Boolean);
   const statusTone =
     status === "ok"
       ? "border-emerald-200 bg-emerald-50"
@@ -289,18 +297,37 @@ function BulkRowCard({ row, index, status, onUpdate, onRemove }) {
           ) : null}
         </div>
         {!status ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Remove
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCollapsed((current) => !current)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              {collapsed ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+              {collapsed ? "Expand" : "Collapse"}
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Remove
+            </button>
+          </div>
         ) : null}
       </div>
 
-      <div className="space-y-4">
+      {collapsed ? (
+        <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 text-sm text-slate-600">
+          {summaryBits.length > 0 ? summaryBits.join(" · ") : "Row details collapsed"}
+        </div>
+      ) : (
+        <div className="space-y-4">
         <RowSection title="Patient Information">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FieldShell label="Patient ID">
@@ -461,7 +488,8 @@ function BulkRowCard({ row, index, status, onUpdate, onRemove }) {
             </div>
           </div>
         </RowSection>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuthUserQuery } from "@/lib/query";
 import { api } from "@/lib/api";
 import { getWorkflowContext } from "@/lib/utils/workflow";
@@ -8,6 +8,7 @@ import ManualEntryTab from "@/components/insuverif/ManualEntryTab";
 import UploadTab from "@/components/insuverif/UploadTab";
 import EmrTab from "@/components/insuverif/EmrTab.jsx";
 import BulkVerifyTab from "@/components/insuverif/BulkVerifyTab";
+import AppSelect from "@/components/ui/app-select";
 import {
   AlertTriangle,
   ArrowRight,
@@ -119,11 +120,37 @@ function WorkflowOption({ workflow, active, onSelect }) {
   );
 }
 
+function ClientSelectionPrompt({ title, description }) {
+  return (
+    <div className="rounded-3xl border border-[#f6d487] bg-gradient-to-br from-[#fff9ec] to-[#fffdf6] p-5 shadow-sm">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-[#b7791f] shadow-sm">
+          <ShieldCheck className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b7791f]">
+            Client Context Required
+          </p>
+          <h3 className="mt-2 text-lg font-bold text-slate-900">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function NewVerification() {
   const { data: user } = useAuthUserQuery();
+  const { data: clientsResponse, isLoading: clientsLoading } = useQuery({
+    queryKey: ["clients", "eligibility-client-selector"],
+    queryFn: () => api.clients.list({ limit: 100 }),
+    enabled: Boolean(user && !user.clientId),
+    staleTime: 5 * 60 * 1000,
+  });
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const workflowContext = useMemo(() => getWorkflowContext(window.location.search), []);
   const [activeWorkflow, setActiveWorkflow] = useState(() => getInitialWorkflow(params));
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [lastRequest, setLastRequest] = useState(null);
   const [verificationResult, setVerificationResult] = useState(null);
   const [verificationError, setVerificationError] = useState("");
@@ -183,6 +210,11 @@ export default function NewVerification() {
   const selectedWorkflow =
     WORKFLOWS.find((workflow) => workflow.id === activeWorkflow) || WORKFLOWS[0];
   const isPriorAuthFlow = workflowContext.intent === "prior-auth";
+  const availableClients = clientsResponse?.data || clientsResponse?.clients || [];
+  const resolvedClientId = user?.clientId || selectedClientId || "";
+  const requiresSharedClientSelection = !user?.clientId && activeWorkflow !== "bulk";
+  const isWorkflowBlockedByClientSelection =
+    requiresSharedClientSelection && !resolvedClientId && activeWorkflow !== "bulk";
 
   const verifyMutation = useMutation({
     mutationFn: (payload) => api.functions.invoke("availityEligibility", payload),
@@ -207,6 +239,7 @@ export default function NewVerification() {
       providerNpi: formData.provider_npi || "",
       serviceDate: formData.service_date || "",
       submissionType,
+      clientId: resolvedClientId || "",
     };
 
     setLastRequest(requestSnapshot);
@@ -225,6 +258,7 @@ export default function NewVerification() {
         provider_npi: formData.provider_npi || "",
         service_date: formData.service_date || new Date().toISOString().slice(0, 10),
         service_type_code: "30",
+        client_id: resolvedClientId || "",
         patient_id: workflowContext.patientId || formData.patient_id || "",
         gateway_patient_id: formData.gateway_patient_id || "",
         submission_type: submissionType,
@@ -324,6 +358,27 @@ export default function NewVerification() {
               />
             ))}
           </div>
+
+          {requiresSharedClientSelection ? (
+            <div className="mt-5 max-w-md">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Client Workspace
+              </label>
+              <AppSelect
+                value={selectedClientId}
+                onValueChange={setSelectedClientId}
+                placeholder={clientsLoading ? "Loading clients..." : "Select client"}
+                options={availableClients.map((client) => ({
+                  label: client.practiceName || client.name,
+                  value: client.id,
+                }))}
+                triggerClassName="h-[46px] bg-white px-3 py-2.5 text-sm"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                The selected client will be used for patient lookup, EMR pull, and verification submission.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {activeWorkflow === "manual" ? (
@@ -334,11 +389,19 @@ export default function NewVerification() {
                 Enter or confirm the details below, then run the check.
               </p>
             </div>
-            <ManualEntryTab
-              onSubmit={handleRunVerification}
-              prefill={prefill}
-              submitting={verifyMutation.isPending}
-            />
+            {isWorkflowBlockedByClientSelection ? (
+              <ClientSelectionPrompt
+                title="Select a client workspace first"
+                description="Choose the client this verification belongs to so we can load the right patient context, insurance data, and backend routing before you run the check."
+              />
+            ) : (
+              <ManualEntryTab
+                onSubmit={handleRunVerification}
+                prefill={prefill}
+                submitting={verifyMutation.isPending}
+                clientId={resolvedClientId}
+              />
+            )}
           </div>
         ) : null}
 
@@ -350,7 +413,14 @@ export default function NewVerification() {
                 Upload supporting documents, review the extracted data, and continue.
               </p>
             </div>
-            <UploadTab onSubmit={handleRunVerification} />
+            {isWorkflowBlockedByClientSelection ? (
+              <ClientSelectionPrompt
+                title="Select a client before uploading documents"
+                description="Document extraction needs the target client workspace so the uploaded details, patient lookup, and verification request all stay tied to the correct account."
+              />
+            ) : (
+              <UploadTab onSubmit={handleRunVerification} clientId={resolvedClientId} />
+            )}
           </div>
         ) : null}
 
@@ -374,7 +444,14 @@ export default function NewVerification() {
                 Search a connected system and complete any missing details.
               </p>
             </div>
-            <EmrTab onSubmit={handleRunVerification} />
+            {isWorkflowBlockedByClientSelection ? (
+              <ClientSelectionPrompt
+                title="Select a client before pulling from EMR"
+                description="EMR connection status and chart pulls are scoped to a client workspace, so choose the client first to load the correct connected system and patient records."
+              />
+            ) : (
+              <EmrTab onSubmit={handleRunVerification} clientId={resolvedClientId} />
+            )}
           </div>
         ) : null}
 

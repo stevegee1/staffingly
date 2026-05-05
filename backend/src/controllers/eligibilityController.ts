@@ -7,6 +7,7 @@ import {
   normalizeEligibilityGatewayResponse,
   sendEligibilityVerification,
 } from "../services/masterGatewayService.js";
+import { getEhrSystemById, listEhrSystems } from "../services/emrCatalogService.js";
 
 interface CheckEligibilityBody {
   patientName?: string;
@@ -143,6 +144,43 @@ interface GetHistoryQuery {
   offset?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+}
+
+interface ListEhrSystemsQuery {
+  clientId?: string;
+}
+
+interface SearchEmrPatientsQuery {
+  clientId?: string;
+  search?: string;
+  limit?: string;
+}
+
+interface ConnectEhrSystemBody {
+  clientId?: string;
+}
+
+interface EhrConfigBody {
+  clientId?: string;
+  environmentLabel?: string;
+  baseUrl?: string;
+  authType?: string;
+  clientAppId?: string;
+  clientSecret?: string;
+  redirectUri?: string;
+  scopes?: string;
+  fhirVersion?: string;
+}
+
+interface EhrConfigRecord {
+  environmentLabel: string;
+  baseUrl: string;
+  authType: string;
+  clientAppId: string;
+  clientSecret: string;
+  redirectUri: string;
+  scopes: string;
+  fhirVersion: string;
 }
 
 interface HistoryWhereClause {
@@ -284,6 +322,99 @@ async function resolveEligibilityClientContext({
   throw new Error(
     "A valid client context is required for eligibility checks. Please select or sign in under a client account."
   );
+}
+
+async function resolveEmrClientId({
+  requestedClientId,
+  user,
+}: {
+  requestedClientId?: string | null;
+  user?: AuthenticatedUser;
+}): Promise<string | null> {
+  if (user?.role === "CLIENT_USER") {
+    return user.clientId || null;
+  }
+
+  if (requestedClientId?.trim()) {
+    const client = await prisma.client.findUnique({
+      where: { id: requestedClientId.trim() },
+      select: { id: true },
+    });
+    return client?.id || null;
+  }
+
+  return user?.clientId || null;
+}
+
+function buildEmrPatientProjection(
+  subscriber: {
+    id: string;
+    firstName: string | null;
+    lastName: string;
+    dob: string | null;
+    memberId: string | null;
+    payer: string | null;
+    payerId: string | null;
+    groupNumber: string | null;
+    planType: string | null;
+    clientId: string;
+  },
+  emrName: string
+) {
+  const foundFields = [
+    subscriber.firstName || subscriber.lastName ? "Name" : null,
+    subscriber.dob ? "DOB" : null,
+    subscriber.memberId ? "Member ID" : null,
+    subscriber.payer || subscriber.payerId ? "Payer" : null,
+    subscriber.groupNumber ? "Group Number" : null,
+    subscriber.planType ? "Plan Type" : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const missingFields = [
+    "CPT Code",
+    "Service Date",
+    "Provider NPI",
+  ];
+
+  return {
+    id: subscriber.id,
+    clientId: subscriber.clientId,
+    source: emrName,
+    mrn: subscriber.id,
+    name: `${subscriber.firstName || ""} ${subscriber.lastName || ""}`.trim(),
+    firstName: subscriber.firstName || "",
+    lastName: subscriber.lastName || "",
+    dob: subscriber.dob || "",
+    payer: subscriber.payer || "",
+    payerId: subscriber.payerId || "",
+    memberId: subscriber.memberId || "",
+    groupNumber: subscriber.groupNumber || "",
+    planType: subscriber.planType || "",
+    foundFields,
+    missingFields,
+  };
+}
+
+function parseEhrConfig(rawValue?: string | null): EhrConfigRecord | null {
+  if (!rawValue) return null;
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<EhrConfigRecord>;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    return {
+      environmentLabel: String(parsed.environmentLabel || ""),
+      baseUrl: String(parsed.baseUrl || ""),
+      authType: String(parsed.authType || "smart_on_fhir"),
+      clientAppId: String(parsed.clientAppId || ""),
+      clientSecret: String(parsed.clientSecret || ""),
+      redirectUri: String(parsed.redirectUri || ""),
+      scopes: String(parsed.scopes || ""),
+      fhirVersion: String(parsed.fhirVersion || "R4"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function runEligibilityCheck(
@@ -469,6 +600,246 @@ export async function checkEligibility(req: AuthenticatedRequest, res: Response)
     check_id: execution.checkRecordId,
     gatewayPatientId: execution.gatewayPatientId,
     gateway_patient_id: execution.gatewayPatientId,
+  });
+}
+
+export async function listEhrSystemCatalog(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const { clientId } = req.query as ListEhrSystemsQuery;
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: clientId,
+    user: req.user,
+  });
+
+  let connectedSystem: string | null = null;
+  if (resolvedClientId) {
+    const client = await prisma.client.findUnique({
+      where: { id: resolvedClientId },
+      select: { emrSystem: true },
+    });
+    connectedSystem = client?.emrSystem || null;
+  }
+
+  res.json({ data: listEhrSystems(connectedSystem) });
+}
+
+export async function connectEhrSystem(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params as { id: string };
+  const body = req.body as ConnectEhrSystemBody;
+  const ehrSystem = getEhrSystemById(id);
+
+  if (!ehrSystem) {
+    res.status(404).json({ error: "EHR system not found" });
+    return;
+  }
+
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: body.clientId,
+    user: req.user,
+  });
+
+  if (!resolvedClientId) {
+    res.status(400).json({
+      error: "A client workspace is required before connecting an EHR system.",
+    });
+    return;
+  }
+
+  await prisma.client.update({
+    where: { id: resolvedClientId },
+    data: { emrSystem: ehrSystem.id },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      clientId: resolvedClientId,
+      emrSystem: ehrSystem.id,
+      name: ehrSystem.name,
+    },
+  });
+}
+
+export async function getEhrSystemConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params as { id: string };
+  const { clientId } = req.query as ListEhrSystemsQuery;
+  const ehrSystem = getEhrSystemById(id);
+
+  if (!ehrSystem) {
+    res.status(404).json({ error: "EHR system not found" });
+    return;
+  }
+
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: clientId,
+    user: req.user,
+  });
+
+  if (!resolvedClientId) {
+    res.status(400).json({ error: "A client workspace is required before configuring an EHR." });
+    return;
+  }
+
+  const client = await prisma.client.findUnique({
+    where: { id: resolvedClientId },
+    select: {
+      id: true,
+      emrSystem: true,
+      emrConfigJson: true,
+    },
+  });
+
+  const config = parseEhrConfig(client?.emrConfigJson);
+
+  res.json({
+    data: {
+      clientId: resolvedClientId,
+      emrSystem: client?.emrSystem || "",
+      isConnected: client?.emrSystem === ehrSystem.id,
+      config: config || {
+        environmentLabel: "",
+        baseUrl: "",
+        authType: "smart_on_fhir",
+        clientAppId: "",
+        clientSecret: "",
+        redirectUri: "",
+        scopes: "",
+        fhirVersion: "R4",
+      },
+    },
+  });
+}
+
+export async function saveEhrSystemConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params as { id: string };
+  const body = req.body as EhrConfigBody;
+  const ehrSystem = getEhrSystemById(id);
+
+  if (!ehrSystem) {
+    res.status(404).json({ error: "EHR system not found" });
+    return;
+  }
+
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: body.clientId,
+    user: req.user,
+  });
+
+  if (!resolvedClientId) {
+    res.status(400).json({ error: "A client workspace is required before configuring an EHR." });
+    return;
+  }
+
+  const config: EhrConfigRecord = {
+    environmentLabel: body.environmentLabel?.trim() || "",
+    baseUrl: body.baseUrl?.trim() || "",
+    authType: body.authType?.trim() || "smart_on_fhir",
+    clientAppId: body.clientAppId?.trim() || "",
+    clientSecret: body.clientSecret?.trim() || "",
+    redirectUri: body.redirectUri?.trim() || "",
+    scopes: body.scopes?.trim() || "",
+    fhirVersion: body.fhirVersion?.trim() || "R4",
+  };
+
+  if (!config.baseUrl) {
+    res.status(400).json({ error: "Base URL is required." });
+    return;
+  }
+
+  const client = await prisma.client.update({
+    where: { id: resolvedClientId },
+    data: {
+      emrSystem: ehrSystem.id,
+      emrConfigJson: JSON.stringify(config),
+    },
+    select: {
+      id: true,
+      emrSystem: true,
+      emrConfigJson: true,
+    },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      clientId: client.id,
+      emrSystem: client.emrSystem,
+      config,
+    },
+  });
+}
+
+export async function searchEmrPatients(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params as { id: string };
+  const { clientId, search = "", limit = "20" } = req.query as SearchEmrPatientsQuery;
+  const ehrSystem = getEhrSystemById(id);
+
+  if (!ehrSystem) {
+    res.status(404).json({ error: "EHR system not found" });
+    return;
+  }
+
+  const searchTerm = search.trim();
+  if (!searchTerm) {
+    res.json({ data: [] });
+    return;
+  }
+
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: clientId,
+    user: req.user,
+  });
+
+  const subscribers = await prisma.subscriber.findMany({
+    where: {
+      ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
+      OR: [
+        { firstName: { contains: searchTerm, mode: "insensitive" } },
+        { lastName: { contains: searchTerm, mode: "insensitive" } },
+        { memberId: { contains: searchTerm, mode: "insensitive" } },
+        { id: { contains: searchTerm, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(parseInt(limit || "20", 10) || 20, 50),
+  });
+
+  res.json({
+    data: subscribers.map((subscriber) => buildEmrPatientProjection(subscriber, ehrSystem.name)),
+  });
+}
+
+export async function getEmrPatient(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id, patientId } = req.params as { id: string; patientId: string };
+  const { clientId } = req.query as SearchEmrPatientsQuery;
+  const ehrSystem = getEhrSystemById(id);
+
+  if (!ehrSystem) {
+    res.status(404).json({ error: "EHR system not found" });
+    return;
+  }
+
+  const resolvedClientId = await resolveEmrClientId({
+    requestedClientId: clientId,
+    user: req.user,
+  });
+
+  const subscriber = await prisma.subscriber.findFirst({
+    where: {
+      id: patientId,
+      ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
+    },
+  });
+
+  if (!subscriber) {
+    res.status(404).json({ error: "Patient not found in the selected EMR feed" });
+    return;
+  }
+
+  res.json({
+    data: buildEmrPatientProjection(subscriber, ehrSystem.name),
   });
 }
 
