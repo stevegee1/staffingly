@@ -59,7 +59,9 @@ export const authenticate = async (
     }
 
     if (user.active === false) {
-      res.status(403).json({ error: "Your account has been deactivated. Contact an administrator." });
+      res
+        .status(403)
+        .json({ error: "Your account has been deactivated. Contact an administrator." });
       return;
     }
 

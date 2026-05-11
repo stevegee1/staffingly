@@ -401,10 +401,11 @@ export default function NewVerification() {
                   label: client.practiceName || client.name,
                   value: client.id,
                 }))}
-                    triggerClassName="sv-select-trigger h-9 bg-white focus:ring-0"
+                triggerClassName="sv-select-trigger h-9 bg-white focus:ring-0"
               />
               <p className="mt-2 text-xs text-slate-500">
-                The selected client will be used for patient lookup, EMR pull, and verification submission.
+                The selected client will be used for patient lookup, EMR pull, and verification
+                submission.
               </p>
             </div>
           ) : null}
@@ -551,7 +552,10 @@ export default function NewVerification() {
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: statusTone.text }}>
+                      <p
+                        className="text-xs font-semibold uppercase tracking-[0.2em]"
+                        style={{ color: statusTone.text }}
+                      >
                         Coverage Status
                       </p>
                       <p className="mt-2 text-2xl font-bold" style={{ color: statusTone.text }}>
@@ -559,7 +563,10 @@ export default function NewVerification() {
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <ResultField label="Confidence" value={`${verificationResult.confidence_score}%`} />
+                      <ResultField
+                        label="Confidence"
+                        value={`${verificationResult.confidence_score}%`}
+                      />
                       <ResultField label="Channel" value={verificationResult.channel_used} />
                       <ResultField
                         label="Response Time"
@@ -572,7 +579,10 @@ export default function NewVerification() {
                       <ResultField label="Plan Name" value={verificationResult.plan_name} />
                       <ResultField label="Plan Type" value={verificationResult.plan_type} />
                       <ResultField label="Network" value={verificationResult.network_status} />
-                      <ResultField label="Effective Date" value={verificationResult.effective_date} />
+                      <ResultField
+                        label="Effective Date"
+                        value={verificationResult.effective_date}
+                      />
                       <ResultField
                         label="Termination Date"
                         value={verificationResult.termination_date}

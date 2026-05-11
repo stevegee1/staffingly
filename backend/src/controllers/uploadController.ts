@@ -59,10 +59,7 @@ export const extractDataFromFile = async (
   res: Response
 ): Promise<void> => {
   const file = req.file as MulterFile | undefined;
-  const {
-    documentType = "Other Document",
-    provider = "auto",
-  } = req.body as {
+  const { documentType = "Other Document", provider = "auto" } = req.body as {
     documentType?: ocrService.SupportedDocumentType;
     provider?: ocrService.OcrProvider;
   };

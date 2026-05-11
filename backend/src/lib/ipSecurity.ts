@@ -54,7 +54,10 @@ function isValidSubnetPrefix(prefix: number, ipVersion: number): boolean {
   return ipVersion === 4 ? prefix >= 0 && prefix <= 32 : prefix >= 0 && prefix <= 128;
 }
 
-export function isIpAllowed(ip: string | null, allowedEntries: string[] | null | undefined): boolean {
+export function isIpAllowed(
+  ip: string | null,
+  allowedEntries: string[] | null | undefined
+): boolean {
   if (!allowedEntries || allowedEntries.length === 0) return true;
   if (!ip) return false;
 

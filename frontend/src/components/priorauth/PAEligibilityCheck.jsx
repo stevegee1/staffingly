@@ -90,7 +90,7 @@ function SummaryField({ label, value }) {
   );
 }
 
-export default function PAEligibilityCheck({ user, onCaseCreated, workflowContext, onClose }) {
+export default function PAEligibilityCheck({ onCaseCreated, workflowContext, onClose }) {
   const prefill = useMemo(
     () => ({
       patient_name: workflowContext?.patientName || "",

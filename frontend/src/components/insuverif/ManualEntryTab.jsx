@@ -126,27 +126,18 @@ function buildFormFromPatient(patient, currentForm) {
     group_number: primaryPolicy?.groupNumber || "",
     plan_name: primaryPolicy?.planName || "",
     plan_type: primaryPolicy?.planType || "",
-    effective_date: primaryPolicy?.effectiveDate
-      ? primaryPolicy.effectiveDate.split("T")[0]
-      : "",
+    effective_date: primaryPolicy?.effectiveDate ? primaryPolicy.effectiveDate.split("T")[0] : "",
     termination_date: primaryPolicy?.terminationDate
       ? primaryPolicy.terminationDate.split("T")[0]
       : "",
     rx_bin: primaryPolicy?.rxBin || "",
     rx_pcn: primaryPolicy?.rxPcn || "",
     rx_group: primaryPolicy?.rxGroup || "",
-    copay_pcp:
-      primaryPolicy?.copayPcp != null
-        ? String(primaryPolicy.copayPcp)
-        : "",
+    copay_pcp: primaryPolicy?.copayPcp != null ? String(primaryPolicy.copayPcp) : "",
     copay_specialist:
-      primaryPolicy?.copaySpecialist != null
-        ? String(primaryPolicy.copaySpecialist)
-        : "",
+      primaryPolicy?.copaySpecialist != null ? String(primaryPolicy.copaySpecialist) : "",
     subscriber_name: primaryPolicy?.subscriberName || "",
-    subscriber_dob: primaryPolicy?.subscriberDob
-      ? primaryPolicy.subscriberDob.split("T")[0]
-      : "",
+    subscriber_dob: primaryPolicy?.subscriberDob ? primaryPolicy.subscriberDob.split("T")[0] : "",
     subscriber_relationship: primaryPolicy?.subscriberRelationship || "Self",
     secondary_payer: secondaryPolicy?.payerName || "",
     secondary_member_id: secondaryPolicy?.memberId || "",
@@ -270,7 +261,11 @@ export default function ManualEntryTab({
                   const selectedPatient = patients.find((patient) => patient.id === value);
                   if (!selectedPatient) return;
                   setShowSecondary(
-                    Boolean(selectedPatient.insurancePolicies?.some((policy) => policy.policyType === "SECONDARY"))
+                    Boolean(
+                      selectedPatient.insurancePolicies?.some(
+                        (policy) => policy.policyType === "SECONDARY"
+                      )
+                    )
                   );
                   setForm((current) => buildFormFromPatient(selectedPatient, current));
                 }}
@@ -666,26 +661,26 @@ export default function ManualEntryTab({
         </div>
       </Section>
 
-        <div className="flex justify-start">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-4 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
-            style={{ backgroundColor: "#293682" }}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Running Eligibility Check...
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="h-5 w-5" />
-                Run Eligibility Check
-              </>
-            )}
-          </button>
-        </div>
+      <div className="flex justify-start">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-xl px-6 py-4 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
+          style={{ backgroundColor: "#293682" }}
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Running Eligibility Check...
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-5 w-5" />
+              Run Eligibility Check
+            </>
+          )}
+        </button>
+      </div>
     </form>
   );
 }

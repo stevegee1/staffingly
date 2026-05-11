@@ -110,10 +110,15 @@ async function getPayerCapabilityProfile(
   const submissionMethod = normalizeText(payerRule.submissionMethod);
   const notes = normalizeText(payerRule.notes);
   const fieldMap = parseJsonRecord(payerRule.fieldMappingJson);
-  const channelHints = normalizeText(String(fieldMap.channelPreference || fieldMap.supportedChannels || ""));
+  const channelHints = normalizeText(
+    String(fieldMap.channelPreference || fieldMap.supportedChannels || "")
+  );
   const supportsFhirHint =
     fieldMap.supportsFhir === true ||
-    containsAny(`${submissionMethod} ${notes} ${channelHints}`, ["fhir", "coverageeligibilityrequest"]);
+    containsAny(`${submissionMethod} ${notes} ${channelHints}`, [
+      "fhir",
+      "coverageeligibilityrequest",
+    ]);
   const supportsEdiHint =
     fieldMap.supportsEdi === true ||
     containsAny(`${submissionMethod} ${notes} ${channelHints}`, ["edi", "270", "271", "availity"]);
@@ -130,7 +135,9 @@ async function getPayerCapabilityProfile(
   };
 }
 
-function mapAvailityError(result: Awaited<ReturnType<typeof availityService.checkEligibility>>): string {
+function mapAvailityError(
+  result: Awaited<ReturnType<typeof availityService.checkEligibility>>
+): string {
   if ("error" in result) {
     return `${result.error}${result.details ? `: ${result.details}` : ""}`;
   }
@@ -238,7 +245,9 @@ async function tryFhirEligibility(
 
   const rawResponse = (await response.json()) as Record<string, unknown>;
   const disposition =
-    typeof rawResponse.disposition === "string" ? rawResponse.disposition : "FHIR eligibility response";
+    typeof rawResponse.disposition === "string"
+      ? rawResponse.disposition
+      : "FHIR eligibility response";
   const outcome = typeof rawResponse.outcome === "string" ? rawResponse.outcome : "unknown";
   const insurance = Array.isArray(rawResponse.insurance) ? rawResponse.insurance[0] : null;
   const inforce =
@@ -265,7 +274,9 @@ async function tryFhirEligibility(
     confidenceScore: inforce ? 72 : 60,
     responseTimeSeconds,
     channelUsed: "StaffVerify In-App EV Engine (FHIR CoverageEligibilityRequest)",
-    flags: inforce ? [] : ["FHIR returned limited benefit detail — review coverage manually if needed."],
+    flags: inforce
+      ? []
+      : ["FHIR returned limited benefit detail — review coverage manually if needed."],
     requiresHumanReview: !inforce,
     rawResponse,
     routingTrace,

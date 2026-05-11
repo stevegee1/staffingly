@@ -8,7 +8,7 @@
  * 4. No mock fallback - real OCR only
  */
 
-type HeicConvertFn = (options: {
+type HeicConvertFn = (_options: {
   buffer: Buffer;
   format: "JPEG" | "PNG";
   quality?: number;
@@ -481,7 +481,9 @@ function finalizeResult(
 
   const overallConfidence =
     confidences.length > 0
-      ? Math.round((confidences.reduce((total, value) => total + value, 0) / confidences.length) * 100)
+      ? Math.round(
+          (confidences.reduce((total, value) => total + value, 0) / confidences.length) * 100
+        )
       : 0;
 
   const lowConfidenceFields = fieldEntries
@@ -514,7 +516,11 @@ function createProviderUnavailableResult(
   return finalizeResult(createEmptyExtraction(), channelUsed, 0, error);
 }
 
-function extractLabeledValue(text: string, labels: string[], pattern = "([A-Z0-9][A-Z0-9\\-\\/ ]{1,40})") {
+function extractLabeledValue(
+  text: string,
+  labels: string[],
+  pattern = "([A-Z0-9][A-Z0-9\\-\\/ ]{1,40})"
+) {
   for (const label of labels) {
     const regex = new RegExp(`${label}[\\s:#-]*${pattern}`, "i");
     const match = text.match(regex);
@@ -588,7 +594,15 @@ function parseInsuranceCardText(rawText: string): InsuranceCardExtraction {
   );
   extraction.memberId = buildField(
     "memberId",
-    extractLabeledValue(text, ["member id", "member#", "member no", "id#", "id no", "subscriber id", "identification number"]),
+    extractLabeledValue(text, [
+      "member id",
+      "member#",
+      "member no",
+      "id#",
+      "id no",
+      "subscriber id",
+      "identification number",
+    ]),
     0.84
   );
   extraction.groupNumber = buildField(
@@ -599,7 +613,11 @@ function parseInsuranceCardText(rawText: string): InsuranceCardExtraction {
   extraction.subscriberName = buildField("subscriberName", extractName(text), 0.74);
   extraction.subscriberDob = buildField(
     "subscriberDob",
-    extractLabeledValue(text, ["dob", "date of birth", "birth date"], "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"),
+    extractLabeledValue(
+      text,
+      ["dob", "date of birth", "birth date"],
+      "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"
+    ),
     0.78
   );
   extraction.planName = buildField(
@@ -609,7 +627,8 @@ function parseInsuranceCardText(rawText: string): InsuranceCardExtraction {
   );
   extraction.planType = buildField(
     "planType",
-    PLAN_TYPE_PATTERNS.find((planType) => text.toUpperCase().includes(planType.toUpperCase())) || null,
+    PLAN_TYPE_PATTERNS.find((planType) => text.toUpperCase().includes(planType.toUpperCase())) ||
+      null,
     0.75
   );
   extraction.rxBin = buildField(
@@ -634,7 +653,11 @@ function parseInsuranceCardText(rawText: string): InsuranceCardExtraction {
   );
   extraction.effectiveDate = buildField(
     "effectiveDate",
-    extractLabeledValue(text, ["effective date", "effective"], "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"),
+    extractLabeledValue(
+      text,
+      ["effective date", "effective"],
+      "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"
+    ),
     0.72
   );
 
@@ -708,7 +731,9 @@ function extractCityStateZipFromAddress(text: string): {
 
     const nextLine = lines[index + 1] || "";
     const combined = `${line} ${nextLine}`.trim();
-    const cityStateZipMatch = combined.match(/([A-Z][A-Z .'-]+),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i);
+    const cityStateZipMatch = combined.match(
+      /([A-Z][A-Z .'-]+),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i
+    );
     if (cityStateZipMatch) {
       const address = sanitizeAddressLine(line);
       const city = sanitizeCity(cityStateZipMatch[1]);
@@ -734,13 +759,21 @@ function extractCommonDocumentFields(text: string): Record<string, string | null
     extractName(text) || extractLabeledValue(text, ["patient name"], "([A-Z][A-Z ,.'-]{2,50})");
   const payerName =
     extractKnownPayer(text) ||
-    extractLabeledValue(text, ["payer", "insurance", "insurance company"], "([A-Z][A-Z0-9 &'./-]{2,60})");
+    extractLabeledValue(
+      text,
+      ["payer", "insurance", "insurance company"],
+      "([A-Z][A-Z0-9 &'./-]{2,60})"
+    );
   const memberId = extractLabeledValue(
     text,
     ["member id", "member#", "subscriber id", "insurance id", "id number"],
     "([A-Z0-9\\-]{3,30})"
   );
-  const groupNumber = extractLabeledValue(text, ["group number", "group#", "group"], "([A-Z0-9\\-]{2,30})");
+  const groupNumber = extractLabeledValue(
+    text,
+    ["group number", "group#", "group"],
+    "([A-Z0-9\\-]{2,30})"
+  );
   const patientDob = extractLabeledValue(
     text,
     ["dob", "date of birth", "patient dob", "birth date"],
@@ -773,11 +806,7 @@ function extractCommonDocumentFields(text: string): Record<string, string | null
     ["relationship", "relation to subscriber", "subscriber relationship"],
     "([A-Z][A-Z /-]{2,30})"
   );
-  const gender = extractLabeledValue(
-    text,
-    ["gender", "sex"],
-    "([A-Z][A-Z /-]{0,20})"
-  );
+  const gender = extractLabeledValue(text, ["gender", "sex"], "([A-Z][A-Z /-]{0,20})");
   const facilityName = extractLabeledValue(
     text,
     ["facility", "facility name", "location", "clinic"],
@@ -801,21 +830,36 @@ function extractCommonDocumentFields(text: string): Record<string, string | null
     payerId: extractLabeledValue(text, ["payer id", "payor id"], "([A-Z0-9\\-]{2,20})"),
     memberId: normalizeMemberId(memberId),
     groupNumber: normalizeGroupCode(groupNumber),
-    planName: titleCaseWords(extractLabeledValue(text, ["plan name", "plan"], "([A-Z0-9][A-Z0-9\\-\\/ ]{2,50})")),
+    planName: titleCaseWords(
+      extractLabeledValue(text, ["plan name", "plan"], "([A-Z0-9][A-Z0-9\\-\\/ ]{2,50})")
+    ),
     planType: normalizePlanType(
-      PLAN_TYPE_PATTERNS.find((planType) => text.toUpperCase().includes(planType.toUpperCase())) || null
+      PLAN_TYPE_PATTERNS.find((planType) => text.toUpperCase().includes(planType.toUpperCase())) ||
+        null
     ),
     subscriberName: sanitizeNameCandidate(
       extractLabeledValue(text, ["subscriber name", "member name"], "([A-Z][A-Z ,.'-]{2,50})")
     ),
     subscriberDob: normalizeDate(
-      extractLabeledValue(text, ["subscriber dob"], "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})")
+      extractLabeledValue(
+        text,
+        ["subscriber dob"],
+        "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"
+      )
     ),
     rxBin: normalizeWhitespace(extractLabeledValue(text, ["rxbin", "rx bin", "bin"], "(\\d{6,8})")),
-    rxPcn: normalizeWhitespace(extractLabeledValue(text, ["rxpcn", "rx pcn", "pcn"], "([A-Z0-9\\-]{2,20})")),
-    rxGroup: normalizeWhitespace(extractLabeledValue(text, ["rxgrp", "rx group"], "([A-Z0-9\\-]{2,20})")),
+    rxPcn: normalizeWhitespace(
+      extractLabeledValue(text, ["rxpcn", "rx pcn", "pcn"], "([A-Z0-9\\-]{2,20})")
+    ),
+    rxGroup: normalizeWhitespace(
+      extractLabeledValue(text, ["rxgrp", "rx group"], "([A-Z0-9\\-]{2,20})")
+    ),
     effectiveDate: normalizeDate(
-      extractLabeledValue(text, ["effective date", "effective"], "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})")
+      extractLabeledValue(
+        text,
+        ["effective date", "effective"],
+        "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"
+      )
     ),
     serviceDate: normalizeDate(serviceDate),
     providerName: sanitizeNameCandidate(providerName) || titleCaseWords(providerName),
@@ -887,7 +931,9 @@ function buildGenericExtractionResult(
   };
 }
 
-function normalizeSupportedDocumentType(documentType: string | null | undefined): SupportedDocumentType {
+function normalizeSupportedDocumentType(
+  documentType: string | null | undefined
+): SupportedDocumentType {
   if (!documentType) {
     return "Other Document";
   }
@@ -896,9 +942,7 @@ function normalizeSupportedDocumentType(documentType: string | null | undefined)
   return matchedType || "Other Document";
 }
 
-function buildInsuranceCardGenericResult(
-  extraction: ExtractionResult
-): GenericExtractionResult {
+function buildInsuranceCardGenericResult(extraction: ExtractionResult): GenericExtractionResult {
   return {
     success: extraction.success,
     fields: flattenExtraction(extraction.fields),
@@ -1223,16 +1267,13 @@ async function extractTextWithOcrSpace(
     return null;
   }
 
-  const formData = new FormData();
+  const formData = new globalThis.FormData();
   formData.append("apikey", apiKey);
   formData.append("language", "eng");
   formData.append("isOverlayRequired", "false");
   formData.append("OCREngine", "2");
   formData.append("scale", "true");
-  formData.append(
-    "base64Image",
-    `data:${mimeType};base64,${imageBuffer.toString("base64")}`
-  );
+  formData.append("base64Image", `data:${mimeType};base64,${imageBuffer.toString("base64")}`);
 
   const response = await fetch("https://api.ocr.space/parse/image", {
     method: "POST",
@@ -1251,7 +1292,9 @@ async function extractTextWithOcrSpace(
     throw new Error(errorMessage || "OCR.space failed to process the image");
   }
 
-  const parsedText = data.ParsedResults?.map((result) => result.ParsedText || "").join("\n").trim();
+  const parsedText = data.ParsedResults?.map((result) => result.ParsedText || "")
+    .join("\n")
+    .trim();
   return parsedText || null;
 }
 
@@ -1288,7 +1331,7 @@ async function extractWithOcrSpace(
 
 async function extractTextWithGoogleCloudVision(
   imageBuffer: Buffer,
-  mimeType: string
+  _mimeType: string
 ): Promise<string | null> {
   const apiKey = getGoogleCloudVisionApiKey();
   if (!apiKey) {
@@ -1329,7 +1372,8 @@ async function extractTextWithGoogleCloudVision(
     throw new Error(result.error.message);
   }
 
-  const fullText = result?.fullTextAnnotation?.text || result?.textAnnotations?.[0]?.description || null;
+  const fullText =
+    result?.fullTextAnnotation?.text || result?.textAnnotations?.[0]?.description || null;
   return normalizeWhitespace(fullText);
 }
 
@@ -1405,7 +1449,10 @@ async function extractWithAzure(imageBuffer: Buffer): Promise<ExtractionResult> 
   const startTime = Date.now();
 
   if (!(await initAzureClient()) || !azureClient) {
-    return createProviderUnavailableResult("azure", "Azure Document Intelligence is not configured");
+    return createProviderUnavailableResult(
+      "azure",
+      "Azure Document Intelligence is not configured"
+    );
   }
 
   try {
@@ -1488,7 +1535,9 @@ export async function extractInsuranceCard(
   }
 
   const availableProviders = await getAvailableOcrProviders();
-  const configuredProviders = availableProviders.filter((item) => item.available).map((item) => item.label);
+  const configuredProviders = availableProviders
+    .filter((item) => item.available)
+    .map((item) => item.label);
   const error =
     configuredProviders.length > 0
       ? "Configured OCR providers could not extract usable insurance data from this image."

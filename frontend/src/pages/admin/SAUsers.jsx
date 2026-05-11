@@ -85,7 +85,14 @@ function formatAllowedIpAddresses(value) {
 function parseAllowedIpAddresses(value) {
   if (!value) return [];
 
-  return [...new Set(value.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(/\r?\n|,/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    ),
+  ];
 }
 
 function normalizeUser(user) {

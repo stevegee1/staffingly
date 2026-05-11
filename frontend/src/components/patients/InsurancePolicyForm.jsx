@@ -134,9 +134,10 @@ export default function InsurancePolicyForm({
   const [captureReview, setCaptureReview] = useState(null);
   const resolvedPayerName =
     form.payerName === "Other" ? form.customPayerName.trim() : form.payerName.trim();
-  const payerOptions = withCurrentOption([
-    ...new Set(knownPayerNames.concat("Other")),
-  ], form.payerName);
+  const payerOptions = withCurrentOption(
+    [...new Set(knownPayerNames.concat("Other"))],
+    form.payerName
+  );
   const planTypeOptions = withCurrentOption(PLAN_TYPES, form.planType);
 
   const updateField = (field) => (event) =>

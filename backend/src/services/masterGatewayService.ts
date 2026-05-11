@@ -284,7 +284,9 @@ export function normalizeEligibilityGatewayResponse(raw: unknown): Record<string
     (asString(payload.status)?.toLowerCase() === "error" ? asString(payload.message) : null) ||
     asString(rootPayload.error) ||
     asString(rootPayload.errorMessage) ||
-    (asString(rootPayload.status)?.toLowerCase() === "error" ? asString(rootPayload.message) : null);
+    (asString(rootPayload.status)?.toLowerCase() === "error"
+      ? asString(rootPayload.message)
+      : null);
 
   const coverageStatus =
     asString(payload.coverageStatus) ||
@@ -296,14 +298,18 @@ export function normalizeEligibilityGatewayResponse(raw: unknown): Record<string
   const explicitSuccess = asBoolean(payload.success) ?? asBoolean(rootPayload.success);
   const success =
     explicitSuccess ??
-    (!rawError && asString(payload.status)?.toLowerCase() !== "error" && coverageStatus !== "Unknown");
+    (!rawError &&
+      asString(payload.status)?.toLowerCase() !== "error" &&
+      coverageStatus !== "Unknown");
 
   return {
     success,
     coverageStatus,
     coverage_status: coverageStatus,
-    planName: asString(payload.planName) || asString(payload.plan_name) || asString(payload.plan) || "",
-    plan_name: asString(payload.planName) || asString(payload.plan_name) || asString(payload.plan) || "",
+    planName:
+      asString(payload.planName) || asString(payload.plan_name) || asString(payload.plan) || "",
+    plan_name:
+      asString(payload.planName) || asString(payload.plan_name) || asString(payload.plan) || "",
     planType: asString(payload.planType) || asString(payload.plan_type) || "",
     plan_type: asString(payload.planType) || asString(payload.plan_type) || "",
     networkStatus: asString(payload.networkStatus) || asString(payload.network_status) || "",

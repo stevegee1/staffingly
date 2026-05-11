@@ -491,11 +491,7 @@ export default function ClientBrandingAdmin() {
                           Publish these settings to the selected client portal.
                         </p>
                       </div>
-                      <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="sv-primary-btn"
-                      >
+                      <button onClick={handleSave} disabled={saving} className="sv-primary-btn">
                         {saving ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : saved ? (

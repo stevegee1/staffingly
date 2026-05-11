@@ -35,8 +35,7 @@ export default function PASubmission({ paCase, onUpdate }) {
         gatewayPatientId: paCase.gateway_patient_id || paCase.gatewayPatientId,
         procedureName: paCase.procedure_name,
         icd10: paCase.diagnosis_codes?.[0] || "",
-        extractedDocumentText:
-          paCase.medical_necessity_summary || paCase.intake_notes || "",
+        extractedDocumentText: paCase.medical_necessity_summary || paCase.intake_notes || "",
       });
       await onUpdate({
         submission_method: method,

@@ -27,8 +27,8 @@ export default function Processing() {
           <p className="font-semibold text-slate-800">What changed</p>
           <p className="mt-2">
             The old screen advanced through fixed, frontend-only status messages. That made it look
-            like we had detailed live backend telemetry when we really only had a single request
-            and response. The verification page now shows the actual states the frontend knows.
+            like we had detailed live backend telemetry when we really only had a single request and
+            response. The verification page now shows the actual states the frontend knows.
           </p>
         </div>
 

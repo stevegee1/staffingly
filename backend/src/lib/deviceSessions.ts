@@ -121,9 +121,7 @@ export function removeRegisteredDevice(
   return { devices: remaining, removed };
 }
 
-export function toRegisteredDevicesJson(
-  devices: RegisteredDeviceRecord[]
-): Prisma.InputJsonValue {
+export function toRegisteredDevicesJson(devices: RegisteredDeviceRecord[]): Prisma.InputJsonValue {
   return devices as unknown as Prisma.InputJsonValue;
 }
 

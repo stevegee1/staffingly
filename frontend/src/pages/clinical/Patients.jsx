@@ -580,11 +580,7 @@ export default function Patients() {
               ) : null}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setPatientModal("add")}
-              className="sv-primary-btn"
-            >
+            <button type="button" onClick={() => setPatientModal("add")} className="sv-primary-btn">
               <Plus className="h-4 w-4" />
               New Patient
             </button>

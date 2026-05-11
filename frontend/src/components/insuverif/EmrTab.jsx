@@ -56,11 +56,11 @@ function ConnectModal({ emr, onClose, onSave, isSaving, canConnect, clientId }) 
         }));
       } catch (error) {
         if (!ignore) {
-            toast({
-              title: "Unable to load EMR settings",
-              description: error?.message || "Please try again.",
-              variant: "error",
-            });
+          toast({
+            title: "Unable to load EMR settings",
+            description: error?.message || "Please try again.",
+            variant: "error",
+          });
         }
       } finally {
         if (!ignore) {
@@ -110,7 +110,7 @@ function ConnectModal({ emr, onClose, onSave, isSaving, canConnect, clientId }) 
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             A client-linked workspace is required before an EHR can be connected here.
           </div>
-          )}
+        )}
 
         {canConnect ? (
           <div className="mt-5 space-y-4">
@@ -257,11 +257,14 @@ export default function EmrTab({ onSubmit, clientId = "" }) {
 
   const trimmedSearch = searchQuery.trim();
 
-  const { data: ehrSystemsResponse, isLoading: ehrSystemsLoading, isError: ehrSystemsError } =
-    useQuery({
-      queryKey: ["emr", "systems", clientId],
-      queryFn: () => api.emr.listSystems(clientId ? { clientId } : {}),
-    });
+  const {
+    data: ehrSystemsResponse,
+    isLoading: ehrSystemsLoading,
+    isError: ehrSystemsError,
+  } = useQuery({
+    queryKey: ["emr", "systems", clientId],
+    queryFn: () => api.emr.listSystems(clientId ? { clientId } : {}),
+  });
 
   const ehrSystems = ehrSystemsResponse?.data || [];
 
@@ -289,11 +292,7 @@ export default function EmrTab({ onSubmit, clientId = "" }) {
   const { data: selectedPatientResponse, isLoading: loadingSelectedPatient } = useQuery({
     queryKey: ["emr", "patient", selectedEhr?.id, selectedPatientId, clientId],
     queryFn: () =>
-      api.emr.getPatient(
-        selectedEhr.id,
-        selectedPatientId,
-        clientId ? { clientId } : {}
-      ),
+      api.emr.getPatient(selectedEhr.id, selectedPatientId, clientId ? { clientId } : {}),
     enabled: Boolean(selectedEhr?.id && selectedPatientId),
   });
 
@@ -326,12 +325,12 @@ export default function EmrTab({ onSubmit, clientId = "" }) {
       return;
     }
 
-      try {
-        setSavingConnection(true);
-        await api.emr.saveSystemConfig(connectModal.id, {
-          clientId,
-          ...configValues,
-        });
+    try {
+      setSavingConnection(true);
+      await api.emr.saveSystemConfig(connectModal.id, {
+        clientId,
+        ...configValues,
+      });
       toast({
         title: "EMR settings saved",
         description: `${connectModal.name} is now configured for this client workspace.`,
@@ -567,53 +566,53 @@ export default function EmrTab({ onSubmit, clientId = "" }) {
       {showForm && selectedPatient && (
         <div>
           <h3 className="font-bold text-slate-700 text-sm mb-4">Complete Verification Form</h3>
-            <ManualEntryTab
-              onSubmit={onSubmit}
-              clientId={clientId}
-              showPatientSelector={false}
-              prefill={{
-                patient_id: selectedPatient.id || "",
-                first_name: selectedPatient.firstName || selectedPatient.name.split(" ")[0] || "",
-                last_name:
-                  selectedPatient.lastName ||
-                  selectedPatient.name.split(" ").slice(1).join(" ") ||
-                  "",
-                middle_name: selectedPatient.middleName || "",
-                dob: selectedPatient.dob || "",
-                gender: selectedPatient.gender || "",
-                phone: selectedPatient.phone || "",
-                email: selectedPatient.email || "",
-                address: selectedPatient.address || "",
-                city: selectedPatient.city || "",
-                state: selectedPatient.state || "",
-                zip: selectedPatient.zip || "",
-                payer: selectedPatient.payer || "",
-                payer_id: selectedPatient.payerId || "",
-                member_id: selectedPatient.memberId || "",
-                group_number: selectedPatient.groupNumber || "",
-                plan_name: selectedPatient.planName || "",
-                plan_type: selectedPatient.planType || "",
-                effective_date: selectedPatient.effectiveDate || "",
-                termination_date: selectedPatient.terminationDate || "",
-                rx_bin: selectedPatient.rxBin || "",
-                rx_pcn: selectedPatient.rxPcn || "",
-                rx_group: selectedPatient.rxGroup || "",
-                copay_pcp: selectedPatient.copayPcp || "",
-                copay_specialist: selectedPatient.copaySpecialist || "",
-                subscriber_name: selectedPatient.subscriberName || "",
-                subscriber_dob: selectedPatient.subscriberDob || "",
-                subscriber_relationship: selectedPatient.subscriberRelationship || "Self",
-                secondary_payer: selectedPatient.secondaryPayer || "",
-                secondary_member_id: selectedPatient.secondaryMemberId || "",
-                secondary_group_number: selectedPatient.secondaryGroupNumber || "",
-                secondary_plan_name: selectedPatient.secondaryPlanName || "",
-                provider_npi: selectedPatient.providerNpi || "",
-                service_date: selectedPatient.serviceDate || "",
-                service_type: selectedPatient.serviceType || "",
-                cpt_code: selectedPatient.cptCode || "",
-                facility_name: selectedPatient.facilityName || "",
-                notes: selectedPatient.notes || "",
-              }}
+          <ManualEntryTab
+            onSubmit={onSubmit}
+            clientId={clientId}
+            showPatientSelector={false}
+            prefill={{
+              patient_id: selectedPatient.id || "",
+              first_name: selectedPatient.firstName || selectedPatient.name.split(" ")[0] || "",
+              last_name:
+                selectedPatient.lastName ||
+                selectedPatient.name.split(" ").slice(1).join(" ") ||
+                "",
+              middle_name: selectedPatient.middleName || "",
+              dob: selectedPatient.dob || "",
+              gender: selectedPatient.gender || "",
+              phone: selectedPatient.phone || "",
+              email: selectedPatient.email || "",
+              address: selectedPatient.address || "",
+              city: selectedPatient.city || "",
+              state: selectedPatient.state || "",
+              zip: selectedPatient.zip || "",
+              payer: selectedPatient.payer || "",
+              payer_id: selectedPatient.payerId || "",
+              member_id: selectedPatient.memberId || "",
+              group_number: selectedPatient.groupNumber || "",
+              plan_name: selectedPatient.planName || "",
+              plan_type: selectedPatient.planType || "",
+              effective_date: selectedPatient.effectiveDate || "",
+              termination_date: selectedPatient.terminationDate || "",
+              rx_bin: selectedPatient.rxBin || "",
+              rx_pcn: selectedPatient.rxPcn || "",
+              rx_group: selectedPatient.rxGroup || "",
+              copay_pcp: selectedPatient.copayPcp || "",
+              copay_specialist: selectedPatient.copaySpecialist || "",
+              subscriber_name: selectedPatient.subscriberName || "",
+              subscriber_dob: selectedPatient.subscriberDob || "",
+              subscriber_relationship: selectedPatient.subscriberRelationship || "Self",
+              secondary_payer: selectedPatient.secondaryPayer || "",
+              secondary_member_id: selectedPatient.secondaryMemberId || "",
+              secondary_group_number: selectedPatient.secondaryGroupNumber || "",
+              secondary_plan_name: selectedPatient.secondaryPlanName || "",
+              provider_npi: selectedPatient.providerNpi || "",
+              service_date: selectedPatient.serviceDate || "",
+              service_type: selectedPatient.serviceType || "",
+              cpt_code: selectedPatient.cptCode || "",
+              facility_name: selectedPatient.facilityName || "",
+              notes: selectedPatient.notes || "",
+            }}
           />
         </div>
       )}

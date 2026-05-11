@@ -45,7 +45,6 @@ export function BillingAccessDenied() {
 export function canAccessBilling(user) {
   const normalizedRole = user?.role?.toLowerCase?.();
   return (
-    user &&
-    ["finance_admin", "super_admin", "admin", "staffingly_admin"].includes(normalizedRole)
+    user && ["finance_admin", "super_admin", "admin", "staffingly_admin"].includes(normalizedRole)
   );
 }

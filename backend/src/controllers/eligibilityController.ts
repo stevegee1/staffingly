@@ -487,7 +487,7 @@ async function executeBulkGatewayRequest(
     }
 
     const rawItem = rawItems[index];
-    if (rawItem == null) {
+    if (rawItem === null || rawItem === undefined) {
       executions.push({
         execution: null,
         error: fallbackError || "The bulk gateway response was missing a row result.",
@@ -495,7 +495,9 @@ async function executeBulkGatewayRequest(
       continue;
     }
 
-    const normalized = normalizeEligibilityGatewayResponse(rawItem) as EligibilityResult & {
+    const normalized = normalizeEligibilityGatewayResponse(
+      rawItem
+    ) as unknown as EligibilityResult & {
       rawResponse?: unknown;
     };
 
@@ -661,7 +663,9 @@ function buildEmrPatientProjection(
   const today = new Date().toISOString().slice(0, 10);
 
   const foundFields = [
-    patient?.firstName || patient?.lastName || subscriber.firstName || subscriber.lastName ? "Name" : null,
+    patient?.firstName || patient?.lastName || subscriber.firstName || subscriber.lastName
+      ? "Name"
+      : null,
     patient?.dob || subscriber.dob ? "DOB" : null,
     patient?.gender ? "Gender" : null,
     patient?.phone ? "Phone" : null,
@@ -693,8 +697,7 @@ function buildEmrPatientProjection(
     clientId: subscriber.clientId,
     source: emrName,
     mrn: subscriber.id,
-    name:
-      `${patient?.firstName || subscriber.firstName || ""} ${patient?.lastName || subscriber.lastName || ""}`.trim(),
+    name: `${patient?.firstName || subscriber.firstName || ""} ${patient?.lastName || subscriber.lastName || ""}`.trim(),
     firstName: patient?.firstName || subscriber.firstName || "",
     lastName: patient?.lastName || subscriber.lastName || "",
     middleName: patient?.middleName || "",
@@ -717,9 +720,14 @@ function buildEmrPatientProjection(
     rxBin: primaryPolicy?.rxBin || "",
     rxPcn: primaryPolicy?.rxPcn || "",
     rxGroup: primaryPolicy?.rxGroup || "",
-    copayPcp: primaryPolicy?.copayPcp != null ? String(primaryPolicy.copayPcp) : "",
+    copayPcp:
+      primaryPolicy?.copayPcp !== null && primaryPolicy?.copayPcp !== undefined
+        ? String(primaryPolicy.copayPcp)
+        : "",
     copaySpecialist:
-      primaryPolicy?.copaySpecialist != null ? String(primaryPolicy.copaySpecialist) : "",
+      primaryPolicy?.copaySpecialist !== null && primaryPolicy?.copaySpecialist !== undefined
+        ? String(primaryPolicy.copaySpecialist)
+        : "",
     subscriberName:
       primaryPolicy?.subscriberName ||
       `${patient?.firstName || subscriber.firstName || ""} ${patient?.lastName || subscriber.lastName || ""}`.trim(),
@@ -812,7 +820,6 @@ async function runEligibilityCheck(
     gatewayPatientId,
     submissionType,
     emrType,
-    verificationEngine = "n8n",
   } = payload;
   const clientContext = await resolveEligibilityClientContext({
     clientId,
@@ -937,7 +944,12 @@ async function processBulkBatchJob(
 
       if (!payload || !outcome) {
         resultState.rows.push(
-          buildRowResult(index, payload || ({ memberId: "" } as CheckEligibilityBody), null, "Missing bulk row context")
+          buildRowResult(
+            index,
+            payload || ({ memberId: "" } as CheckEligibilityBody),
+            null,
+            "Missing bulk row context"
+          )
         );
         resultState.failureCount += 1;
         continue;
@@ -957,9 +969,10 @@ async function processBulkBatchJob(
     const message = (error as Error).message || "Bulk eligibility request failed";
     for (let index = 0; index < payloads.length; index += 1) {
       const payload = payloads[index];
-      resultState.rows.push(
-        buildRowResult(index, payload, null, message)
-      );
+      if (!payload) {
+        continue;
+      }
+      resultState.rows.push(buildRowResult(index, payload, null, message));
       resultState.failureCount += 1;
     }
   }
@@ -995,7 +1008,11 @@ function assertCanAccessBatch(
   user?: AuthenticatedUser
 ): boolean {
   if (!user) return false;
-  if (user.role === "SUPER_ADMIN" || user.role === "STAFFINGLY_ADMIN" || user.role === "STAFFINGLY_SUPERVISOR") {
+  if (
+    user.role === "SUPER_ADMIN" ||
+    user.role === "STAFFINGLY_ADMIN" ||
+    user.role === "STAFFINGLY_SUPERVISOR"
+  ) {
     return true;
   }
   if (user.clientId && job.clientId && user.clientId === job.clientId) {

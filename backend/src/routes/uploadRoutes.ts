@@ -29,7 +29,11 @@ router.use(authenticate);
 router.post("/file", upload.single("file"), asyncHandler(uploadController.uploadFile));
 
 // General document extraction for eligibility and prior auth support docs
-router.post("/extract-data", upload.single("file"), asyncHandler(uploadController.extractDataFromFile));
+router.post(
+  "/extract-data",
+  upload.single("file"),
+  asyncHandler(uploadController.extractDataFromFile)
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Insurance Card Upload & OCR Routes
@@ -58,9 +62,6 @@ router.post(
 router.get("/insurance-card/:id/url", asyncHandler(uploadController.getInsuranceCardUrl));
 
 // Confirm reviewed extraction and attach the card to a saved insurance policy
-router.post(
-  "/insurance-card/:id/confirm",
-  asyncHandler(uploadController.confirmInsuranceCard)
-);
+router.post("/insurance-card/:id/confirm", asyncHandler(uploadController.confirmInsuranceCard));
 
 export default router;

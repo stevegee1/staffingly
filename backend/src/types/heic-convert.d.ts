@@ -5,5 +5,5 @@ declare module "heic-convert" {
     quality?: number;
   }
 
-  export default function convert(options: HeicConvertOptions): Promise<Buffer | Uint8Array>;
+  export default function convert(_options: HeicConvertOptions): Promise<Buffer | Uint8Array>;
 }

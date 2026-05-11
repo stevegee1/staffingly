@@ -156,21 +156,27 @@ export async function updateSecuritySettings(
 }
 
 export async function getSystemOverview(_req: AuthenticatedRequest, res: Response): Promise<void> {
-  const [clientTotal, activeClientTotal, userTotal, activeUserTotal, payerTotal, auditLogsLast7Days] =
-    await Promise.all([
-      prisma.client.count(),
-      prisma.client.count({ where: { status: "ACTIVE" } }),
-      prisma.user.count(),
-      prisma.user.count({ where: { active: true } }),
-      prisma.payerRule.count(),
-      prisma.auditLog.count({
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          },
+  const [
+    clientTotal,
+    activeClientTotal,
+    userTotal,
+    activeUserTotal,
+    payerTotal,
+    auditLogsLast7Days,
+  ] = await Promise.all([
+    prisma.client.count(),
+    prisma.client.count({ where: { status: "ACTIVE" } }),
+    prisma.user.count(),
+    prisma.user.count({ where: { active: true } }),
+    prisma.payerRule.count(),
+    prisma.auditLog.count({
+      where: {
+        createdAt: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         },
-      }),
-    ]);
+      },
+    }),
+  ]);
 
   const connectedClients = await prisma.client.findMany({
     where: {
@@ -216,8 +222,7 @@ export async function getSystemOverview(_req: AuthenticatedRequest, res: Respons
         configured: Boolean(
           process.env.AVAILITY_CLIENT_ID?.trim() && process.env.AVAILITY_CLIENT_SECRET?.trim()
         ),
-        tokenUrl:
-          process.env.AVAILITY_TOKEN_URL || "https://api.availity.com/availity/v1/token",
+        tokenUrl: process.env.AVAILITY_TOKEN_URL || "https://api.availity.com/availity/v1/token",
         eligibilityUrl:
           process.env.AVAILITY_ELIGIBILITY_URL || "https://api.availity.com/availity/v1/coverages",
         authMethod: "OAuth 2.0 Client Credentials (scope: hipaa)",

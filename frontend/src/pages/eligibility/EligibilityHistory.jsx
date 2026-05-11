@@ -264,13 +264,13 @@ function FullResultModal({ row, clientName, onClose }) {
             <div className="grid gap-5 lg:grid-cols-[1.2fr,0.8fr]">
               <div className="space-y-5">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Coverage Details
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <SummaryField label="Member ID" value={row.memberId} />
-                  <SummaryField label="Plan Name" value={row.planName} />
-                  <SummaryField label="Plan Type" value={row.planType} />
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Coverage Details
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <SummaryField label="Member ID" value={row.memberId} />
+                    <SummaryField label="Plan Name" value={row.planName} />
+                    <SummaryField label="Plan Type" value={row.planType} />
                     <SummaryField label="Network" value={row.networkStatus} />
                     <SummaryField label="Effective Date" value={row.effectiveDate} />
                     <SummaryField label="Termination Date" value={row.terminationDate} />
@@ -585,11 +585,7 @@ export default function EligibilityHistory() {
         formatCsvDate(row.serviceDate),
         formatCsvDate(row.effectiveDate),
         formatCsvDate(row.terminationDate),
-        gatewayMeta.priorAuthRequired == null
-          ? ""
-          : gatewayMeta.priorAuthRequired
-            ? "Yes"
-            : "No",
+        gatewayMeta.priorAuthRequired == null ? "" : gatewayMeta.priorAuthRequired ? "Yes" : "No",
         row.confidenceScore ?? "",
         row.channelUsed || "",
         row.responseTimeSeconds ?? "",

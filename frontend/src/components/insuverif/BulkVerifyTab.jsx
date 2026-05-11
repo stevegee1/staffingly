@@ -4,9 +4,7 @@ import { useAuthUserQuery } from "@/lib/query";
 import { useQuery } from "@tanstack/react-query";
 import AppSelect from "@/components/ui/app-select";
 import {
-  AlertCircle,
   Brain,
-  CheckCircle,
   ChevronDown,
   ChevronRight,
   Download,
@@ -158,7 +156,8 @@ function validateRow(row) {
   if (!row.payer?.trim() && !row.payer_id?.trim()) issues.push("payer or payer_id required");
   if (!row.member_id?.trim()) issues.push("member_id required");
   if (row.dob && Number.isNaN(Date.parse(row.dob))) issues.push("invalid DOB");
-  if (row.service_date && Number.isNaN(Date.parse(row.service_date))) issues.push("invalid service date");
+  if (row.service_date && Number.isNaN(Date.parse(row.service_date)))
+    issues.push("invalid service date");
   if (row.subscriber_dob && Number.isNaN(Date.parse(row.subscriber_dob))) {
     issues.push("invalid subscriber DOB");
   }
@@ -168,7 +167,9 @@ function validateRow(row) {
 function parseCSV(text) {
   const lines = text.trim().split("\n").filter(Boolean);
   if (lines.length < 2) return { rows: [], error: "Need header + at least 1 data row." };
-  const headers = lines[0].split(",").map((header) => header.trim().toLowerCase().replace(/\s+/g, "_"));
+  const headers = lines[0]
+    .split(",")
+    .map((header) => header.trim().toLowerCase().replace(/\s+/g, "_"));
   const rows = lines.slice(1).map((line, index) => {
     const values = line.split(",").map((value) => value.trim().replace(/^"|"$/g, ""));
     const row = {};
@@ -338,166 +339,253 @@ function BulkRowCard({ row, index, status, onUpdate, onRemove, defaultCollapsed 
         </div>
       ) : (
         <div className="space-y-4">
-        <RowSection title="Patient Information">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FieldShell label="Patient ID">
-              <TextInput value={row.patient_id || ""} onChange={(e) => onUpdate("patient_id", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="First Name">
-              <TextInput value={row.first_name || ""} onChange={(e) => onUpdate("first_name", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Middle Name">
-              <TextInput value={row.middle_name || ""} onChange={(e) => onUpdate("middle_name", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Last Name">
-              <TextInput value={row.last_name || ""} onChange={(e) => onUpdate("last_name", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Date of Birth">
-              <TextInput type="date" value={row.dob || ""} onChange={(e) => onUpdate("dob", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Gender">
-              <AppSelect
-                value={row.gender || ""}
-                onValueChange={(value) => onUpdate("gender", value)}
-                options={GENDERS.map((item) => ({ label: item, value: item }))}
-                placeholder="Select..."
-                triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
-              />
-            </FieldShell>
-            <FieldShell label="Phone">
-              <TextInput value={row.phone || ""} onChange={(e) => onUpdate("phone", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Email">
-              <TextInput type="email" value={row.email || ""} onChange={(e) => onUpdate("email", e.target.value)} />
-            </FieldShell>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <FieldShell label="Street Address">
-                <textarea
-                  value={row.address || ""}
-                  onChange={(e) => onUpdate("address", e.target.value)}
-                  rows={2}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-slate-300 focus:outline-none"
+          <RowSection title="Patient Information">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <FieldShell label="Patient ID">
+                <TextInput
+                  value={row.patient_id || ""}
+                  onChange={(e) => onUpdate("patient_id", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="First Name">
+                <TextInput
+                  value={row.first_name || ""}
+                  onChange={(e) => onUpdate("first_name", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Middle Name">
+                <TextInput
+                  value={row.middle_name || ""}
+                  onChange={(e) => onUpdate("middle_name", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Last Name">
+                <TextInput
+                  value={row.last_name || ""}
+                  onChange={(e) => onUpdate("last_name", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Date of Birth">
+                <TextInput
+                  type="date"
+                  value={row.dob || ""}
+                  onChange={(e) => onUpdate("dob", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Gender">
+                <AppSelect
+                  value={row.gender || ""}
+                  onValueChange={(value) => onUpdate("gender", value)}
+                  options={GENDERS.map((item) => ({ label: item, value: item }))}
+                  placeholder="Select..."
+                  triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
+                />
+              </FieldShell>
+              <FieldShell label="Phone">
+                <TextInput
+                  value={row.phone || ""}
+                  onChange={(e) => onUpdate("phone", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Email">
+                <TextInput
+                  type="email"
+                  value={row.email || ""}
+                  onChange={(e) => onUpdate("email", e.target.value)}
+                />
+              </FieldShell>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <FieldShell label="Street Address">
+                  <textarea
+                    value={row.address || ""}
+                    onChange={(e) => onUpdate("address", e.target.value)}
+                    rows={2}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-slate-300 focus:outline-none"
+                  />
+                </FieldShell>
+              </div>
+              <FieldShell label="City">
+                <TextInput
+                  value={row.city || ""}
+                  onChange={(e) => onUpdate("city", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="State">
+                <AppSelect
+                  value={row.state || ""}
+                  onValueChange={(value) => onUpdate("state", value)}
+                  options={US_STATES.map((item) => ({ label: item, value: item }))}
+                  placeholder="Select..."
+                  triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
+                />
+              </FieldShell>
+              <FieldShell label="ZIP">
+                <TextInput
+                  value={row.zip || ""}
+                  onChange={(e) => onUpdate("zip", e.target.value)}
                 />
               </FieldShell>
             </div>
-            <FieldShell label="City">
-              <TextInput value={row.city || ""} onChange={(e) => onUpdate("city", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="State">
-              <AppSelect
-                value={row.state || ""}
-                onValueChange={(value) => onUpdate("state", value)}
-                options={US_STATES.map((item) => ({ label: item, value: item }))}
-                placeholder="Select..."
-                triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
-              />
-            </FieldShell>
-            <FieldShell label="ZIP">
-              <TextInput value={row.zip || ""} onChange={(e) => onUpdate("zip", e.target.value)} />
-            </FieldShell>
-          </div>
-        </RowSection>
+          </RowSection>
 
-        <RowSection title="Insurance Information">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FieldShell label="Insurance Payer">
-              <TextInput value={row.payer || ""} onChange={(e) => onUpdate("payer", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Payer ID">
-              <TextInput value={row.payer_id || ""} onChange={(e) => onUpdate("payer_id", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Member ID">
-              <TextInput value={row.member_id || ""} onChange={(e) => onUpdate("member_id", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Group Number">
-              <TextInput value={row.group_number || ""} onChange={(e) => onUpdate("group_number", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Plan Name">
-              <TextInput value={row.plan_name || ""} onChange={(e) => onUpdate("plan_name", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Plan Type">
-              <AppSelect
-                value={row.plan_type || ""}
-                onValueChange={(value) => onUpdate("plan_type", value)}
-                options={PLAN_TYPES.map((item) => ({ label: item, value: item }))}
-                placeholder="Select..."
-                triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
-              />
-            </FieldShell>
-            <FieldShell label="Effective Date">
-              <TextInput type="date" value={row.effective_date || ""} onChange={(e) => onUpdate("effective_date", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Termination Date">
-              <TextInput type="date" value={row.termination_date || ""} onChange={(e) => onUpdate("termination_date", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Subscriber Name">
-              <TextInput value={row.subscriber_name || ""} onChange={(e) => onUpdate("subscriber_name", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Subscriber DOB">
-              <TextInput type="date" value={row.subscriber_dob || ""} onChange={(e) => onUpdate("subscriber_dob", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Subscriber Relationship">
-              <AppSelect
-                value={row.subscriber_relationship || "Self"}
-                onValueChange={(value) => onUpdate("subscriber_relationship", value)}
-                options={RELATIONSHIPS.map((item) => ({ label: item, value: item }))}
-                placeholder="Select..."
-                triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
-              />
-            </FieldShell>
-            <FieldShell label="Rx BIN">
-              <TextInput value={row.rx_bin || ""} onChange={(e) => onUpdate("rx_bin", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Rx PCN">
-              <TextInput value={row.rx_pcn || ""} onChange={(e) => onUpdate("rx_pcn", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Rx Group">
-              <TextInput value={row.rx_group || ""} onChange={(e) => onUpdate("rx_group", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Copay (PCP)">
-              <TextInput value={row.copay_pcp || ""} onChange={(e) => onUpdate("copay_pcp", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Copay (Specialist)">
-              <TextInput value={row.copay_specialist || ""} onChange={(e) => onUpdate("copay_specialist", e.target.value)} />
-            </FieldShell>
-          </div>
-        </RowSection>
-
-        <RowSection title="Visit Information">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FieldShell label="Provider NPI">
-              <TextInput value={row.provider_npi || ""} onChange={(e) => onUpdate("provider_npi", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Service Date">
-              <TextInput type="date" value={row.service_date || ""} onChange={(e) => onUpdate("service_date", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Service Type">
-              <AppSelect
-                value={row.service_type || ""}
-                onValueChange={(value) => onUpdate("service_type", value)}
-                options={SERVICE_TYPES.map((item) => ({ label: item, value: item }))}
-                placeholder="Select..."
-                triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
-              />
-            </FieldShell>
-            <FieldShell label="CPT Code">
-              <TextInput value={row.cpt_code || ""} onChange={(e) => onUpdate("cpt_code", e.target.value)} />
-            </FieldShell>
-            <FieldShell label="Facility Name">
-              <TextInput value={row.facility_name || ""} onChange={(e) => onUpdate("facility_name", e.target.value)} />
-            </FieldShell>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <FieldShell label="Notes">
-                <textarea
-                  value={row.notes || ""}
-                  onChange={(e) => onUpdate("notes", e.target.value)}
-                  rows={2}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-slate-300 focus:outline-none"
+          <RowSection title="Insurance Information">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <FieldShell label="Insurance Payer">
+                <TextInput
+                  value={row.payer || ""}
+                  onChange={(e) => onUpdate("payer", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Payer ID">
+                <TextInput
+                  value={row.payer_id || ""}
+                  onChange={(e) => onUpdate("payer_id", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Member ID">
+                <TextInput
+                  value={row.member_id || ""}
+                  onChange={(e) => onUpdate("member_id", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Group Number">
+                <TextInput
+                  value={row.group_number || ""}
+                  onChange={(e) => onUpdate("group_number", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Plan Name">
+                <TextInput
+                  value={row.plan_name || ""}
+                  onChange={(e) => onUpdate("plan_name", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Plan Type">
+                <AppSelect
+                  value={row.plan_type || ""}
+                  onValueChange={(value) => onUpdate("plan_type", value)}
+                  options={PLAN_TYPES.map((item) => ({ label: item, value: item }))}
+                  placeholder="Select..."
+                  triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
+                />
+              </FieldShell>
+              <FieldShell label="Effective Date">
+                <TextInput
+                  type="date"
+                  value={row.effective_date || ""}
+                  onChange={(e) => onUpdate("effective_date", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Termination Date">
+                <TextInput
+                  type="date"
+                  value={row.termination_date || ""}
+                  onChange={(e) => onUpdate("termination_date", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Subscriber Name">
+                <TextInput
+                  value={row.subscriber_name || ""}
+                  onChange={(e) => onUpdate("subscriber_name", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Subscriber DOB">
+                <TextInput
+                  type="date"
+                  value={row.subscriber_dob || ""}
+                  onChange={(e) => onUpdate("subscriber_dob", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Subscriber Relationship">
+                <AppSelect
+                  value={row.subscriber_relationship || "Self"}
+                  onValueChange={(value) => onUpdate("subscriber_relationship", value)}
+                  options={RELATIONSHIPS.map((item) => ({ label: item, value: item }))}
+                  placeholder="Select..."
+                  triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
+                />
+              </FieldShell>
+              <FieldShell label="Rx BIN">
+                <TextInput
+                  value={row.rx_bin || ""}
+                  onChange={(e) => onUpdate("rx_bin", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Rx PCN">
+                <TextInput
+                  value={row.rx_pcn || ""}
+                  onChange={(e) => onUpdate("rx_pcn", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Rx Group">
+                <TextInput
+                  value={row.rx_group || ""}
+                  onChange={(e) => onUpdate("rx_group", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Copay (PCP)">
+                <TextInput
+                  value={row.copay_pcp || ""}
+                  onChange={(e) => onUpdate("copay_pcp", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Copay (Specialist)">
+                <TextInput
+                  value={row.copay_specialist || ""}
+                  onChange={(e) => onUpdate("copay_specialist", e.target.value)}
                 />
               </FieldShell>
             </div>
-          </div>
-        </RowSection>
+          </RowSection>
+
+          <RowSection title="Visit Information">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <FieldShell label="Provider NPI">
+                <TextInput
+                  value={row.provider_npi || ""}
+                  onChange={(e) => onUpdate("provider_npi", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Service Date">
+                <TextInput
+                  type="date"
+                  value={row.service_date || ""}
+                  onChange={(e) => onUpdate("service_date", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Service Type">
+                <AppSelect
+                  value={row.service_type || ""}
+                  onValueChange={(value) => onUpdate("service_type", value)}
+                  options={SERVICE_TYPES.map((item) => ({ label: item, value: item }))}
+                  placeholder="Select..."
+                  triggerClassName="h-11 rounded-2xl border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
+                />
+              </FieldShell>
+              <FieldShell label="CPT Code">
+                <TextInput
+                  value={row.cpt_code || ""}
+                  onChange={(e) => onUpdate("cpt_code", e.target.value)}
+                />
+              </FieldShell>
+              <FieldShell label="Facility Name">
+                <TextInput
+                  value={row.facility_name || ""}
+                  onChange={(e) => onUpdate("facility_name", e.target.value)}
+                />
+              </FieldShell>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <FieldShell label="Notes">
+                  <textarea
+                    value={row.notes || ""}
+                    onChange={(e) => onUpdate("notes", e.target.value)}
+                    rows={2}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:border-slate-300 focus:outline-none"
+                  />
+                </FieldShell>
+              </div>
+            </div>
+          </RowSection>
         </div>
       )}
     </div>
@@ -506,7 +594,11 @@ function BulkRowCard({ row, index, status, onUpdate, onRemove, defaultCollapsed 
 
 export default function BulkVerifyTab() {
   const { data: user } = useAuthUserQuery({ redirectOnError: false });
-  const { data: clientsResponse, error: clientsError, isLoading: clientsLoading } = useQuery({
+  const {
+    data: clientsResponse,
+    error: clientsError,
+    isLoading: clientsLoading,
+  } = useQuery({
     queryKey: ["clients", "bulk-eligibility-selector"],
     queryFn: () => api.clients.list({ limit: 100 }),
     enabled: Boolean(user && !user.clientId),
@@ -749,9 +841,7 @@ Records: ${JSON.stringify(clean.map((row, index) => ({ index, ...row })))}`,
                 {clientsError.message || "Unable to load clients for selection."}
               </p>
             ) : availableClients.length === 0 && !clientsLoading ? (
-              <p className="mt-2 text-xs text-slate-400">
-                No clients are available to select.
-              </p>
+              <p className="mt-2 text-xs text-slate-400">No clients are available to select.</p>
             ) : (
               <p className="mt-2 text-xs text-slate-400">
                 Bulk eligibility batches must be associated with a client.
@@ -799,8 +889,8 @@ Records: ${JSON.stringify(clean.map((row, index) => ({ index, ...row })))}`,
                   !resolvedClientId
                     ? "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
                     : dragOver
-                    ? "border-blue-400 bg-blue-50"
-                    : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      ? "border-blue-400 bg-blue-50"
+                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
                 <Upload className="mx-auto mb-3 h-10 w-10 text-slate-300" />
@@ -971,8 +1061,8 @@ Records: ${JSON.stringify(clean.map((row, index) => ({ index, ...row })))}`,
                       {rowResult.input.patientName || `Row ${rowResult.index + 1}`}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {rowResult.input.payerName || rowResult.input.payerId || "Unknown payer"} · Member ID{" "}
-                      {rowResult.input.memberId}
+                      {rowResult.input.payerName || rowResult.input.payerId || "Unknown payer"} ·
+                      Member ID {rowResult.input.memberId}
                     </p>
                   </div>
                   <span

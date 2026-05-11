@@ -77,10 +77,7 @@ export default function PADenialAppeal({ paCase, onUpdate }) {
         denialReason: denialForm.denial_reason || paCase.denial_reason,
       });
       const gatewayPayload = unwrapGatewayPayload(gatewayResponse);
-      const letter =
-        gatewayPayload?.appeal_letter ||
-        gatewayPayload?.appealLetter ||
-        "";
+      const letter = gatewayPayload?.appeal_letter || gatewayPayload?.appealLetter || "";
 
       if (!letter) {
         throw new Error("The n8n appeal workflow did not return an appeal letter.");

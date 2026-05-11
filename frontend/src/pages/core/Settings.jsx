@@ -46,7 +46,9 @@ function MetricCard({ icon: Icon, label, value, tone }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+            {label}
+          </p>
           <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
         </div>
         <div className={`rounded-2xl p-3 ${tone}`}>
@@ -289,7 +291,9 @@ function RoleBadge({ role }) {
       : "bg-blue-50 text-blue-700 border-blue-200";
 
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${classes}`}>
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${classes}`}
+    >
       {ROLE_LABELS[role] || role}
     </span>
   );
@@ -536,15 +540,22 @@ export default function Settings() {
                       <div className="mt-4 space-y-2 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                         <div className="flex items-center justify-between">
                           <span>Connected clients</span>
-                          <span className="font-semibold text-slate-800">{usage.connectedClients}</span>
+                          <span className="font-semibold text-slate-800">
+                            {usage.connectedClients}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Configured clients</span>
-                          <span className="font-semibold text-slate-800">{usage.configuredClients}</span>
+                          <span className="font-semibold text-slate-800">
+                            {usage.configuredClients}
+                          </span>
                         </div>
                         {selectedClient ? (
                           <div className="border-t border-slate-200 pt-2 text-xs text-slate-500">
-                            Managing setup for <span className="font-semibold text-slate-700">{selectedClient.name}</span>
+                            Managing setup for{" "}
+                            <span className="font-semibold text-slate-700">
+                              {selectedClient.name}
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -555,7 +566,8 @@ export default function Settings() {
                             if (!selectedClientId) {
                               toast({
                                 title: "Select a client workspace",
-                                description: "Pick a client before opening the EMR connection form.",
+                                description:
+                                  "Pick a client before opening the EMR connection form.",
                                 variant: "warning",
                               });
                               return;
@@ -564,7 +576,9 @@ export default function Settings() {
                           }}
                           className="w-full rounded-2xl bg-[#0a7e87] py-3 text-sm font-semibold text-white transition hover:bg-[#08656c]"
                         >
-                          {selectedClientId && emr.isConnected ? "Manage Connection" : "Configure Connection"}
+                          {selectedClientId && emr.isConnected
+                            ? "Manage Connection"
+                            : "Configure Connection"}
                         </button>
                       </div>
                     </div>
@@ -596,23 +610,29 @@ export default function Settings() {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr className="border-b border-slate-200">
-                    {["Payer Name", "EDI Payer ID", "Submission Method", "Portal URL", "Contact Phone"].map(
-                      (header) => (
-                        <th
-                          key={header}
-                          className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"
-                        >
-                          {header}
-                        </th>
-                      )
-                    )}
+                    {[
+                      "Payer Name",
+                      "EDI Payer ID",
+                      "Submission Method",
+                      "Portal URL",
+                      "Contact Phone",
+                    ].map((header) => (
+                      <th
+                        key={header}
+                        className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredPayers.map((payer) => (
                     <tr key={payer.id} className="transition hover:bg-slate-50/80">
                       <td className="px-5 py-4 font-semibold text-slate-900">{payer.payerName}</td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600">{payer.payerId || "—"}</td>
+                      <td className="px-5 py-4 font-mono text-xs text-slate-600">
+                        {payer.payerId || "—"}
+                      </td>
                       <td className="px-5 py-4 text-slate-600">{payer.submissionMethod || "—"}</td>
                       <td className="px-5 py-4 text-blue-600">{payer.portalUrl || "—"}</td>
                       <td className="px-5 py-4 text-slate-600">{payer.phoneNumber || "—"}</td>
@@ -643,12 +663,16 @@ export default function Settings() {
                 <tbody className="divide-y divide-slate-100">
                   {users.map((entry) => (
                     <tr key={entry.id} className="transition hover:bg-slate-50/80">
-                      <td className="px-5 py-4 font-semibold text-slate-900">{entry.name || "—"}</td>
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        {entry.name || "—"}
+                      </td>
                       <td className="px-5 py-4 text-slate-600">{entry.email}</td>
                       <td className="px-5 py-4">
                         <RoleBadge role={entry.role} />
                       </td>
-                      <td className="px-5 py-4 text-slate-500">{entry.client?.name || "Platform"}</td>
+                      <td className="px-5 py-4 text-slate-500">
+                        {entry.client?.name || "Platform"}
+                      </td>
                       <td className="px-5 py-4 text-slate-500">
                         {entry.lastLoginAt ? new Date(entry.lastLoginAt).toLocaleString() : "Never"}
                       </td>

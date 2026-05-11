@@ -37,7 +37,9 @@ function PackageCard({ pkg, canManage, onEdit }) {
     pkg.ratePerEligibilityCheck > 0
       ? { label: "Per Eligibility Check", value: `$${pkg.ratePerEligibilityCheck}` }
       : null,
-    pkg.ratePerPriorAuth > 0 ? { label: "Per Prior Auth", value: `$${pkg.ratePerPriorAuth}` } : null,
+    pkg.ratePerPriorAuth > 0
+      ? { label: "Per Prior Auth", value: `$${pkg.ratePerPriorAuth}` }
+      : null,
     pkg.ratePerAppeal > 0 ? { label: "Per Appeal", value: `$${pkg.ratePerAppeal}` } : null,
   ].filter(Boolean);
 
@@ -77,7 +79,9 @@ function PackageCard({ pkg, canManage, onEdit }) {
           <div>
             <div className="flex items-baseline gap-1 text-slate-900">
               <span className="text-sm font-semibold">$</span>
-              <span className="text-4xl font-black leading-none">{(pkg.monthlyBaseFee || 0).toFixed(0)}</span>
+              <span className="text-4xl font-black leading-none">
+                {(pkg.monthlyBaseFee || 0).toFixed(0)}
+              </span>
               <span className="text-sm font-medium text-slate-500">/mo</span>
             </div>
             <p className="mt-1 text-sm text-slate-500">Base monthly fee</p>
@@ -89,7 +93,9 @@ function PackageCard({ pkg, canManage, onEdit }) {
           )}
         </div>
 
-        {pkg.description && <p className="mt-4 text-sm leading-6 text-slate-600">{pkg.description}</p>}
+        {pkg.description && (
+          <p className="mt-4 text-sm leading-6 text-slate-600">{pkg.description}</p>
+        )}
 
         <div className="mt-5 space-y-3">
           {featureItems.map((item) => (
@@ -207,20 +213,20 @@ function PackageForm({ initial, onSave, onCancel }) {
       } else {
         await api.entities.PricingPackage.create(form);
       }
-        toast({
-          title: form.id ? "Package updated" : "Package created",
-          description: `${form.name} is ready to use.`,
-          variant: "success",
-        });
+      toast({
+        title: form.id ? "Package updated" : "Package created",
+        description: `${form.name} is ready to use.`,
+        variant: "success",
+      });
       onSave();
     } catch (error) {
       const message = error?.response?.data?.message || error?.message || "Please try again.";
       setSaveError(message);
-        toast({
-          title: "Unable to save package",
-          description: message,
-          variant: "error",
-        });
+      toast({
+        title: "Unable to save package",
+        description: message,
+        variant: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -478,10 +484,7 @@ export default function PricingPackages() {
               </p>
             </div>
             {canManagePackages ? (
-              <button
-                onClick={handleNew}
-                className="sv-primary-btn shadow-sm"
-              >
+              <button onClick={handleNew} className="sv-primary-btn shadow-sm">
                 <Plus className="w-4 h-4" /> New Package
               </button>
             ) : (
@@ -515,11 +518,7 @@ export default function PricingPackages() {
         )}
 
         {showForm && (
-          <PackageForm
-            initial={editing}
-            onSave={handleSave}
-            onCancel={() => setShowForm(false)}
-          />
+          <PackageForm initial={editing} onSave={handleSave} onCancel={() => setShowForm(false)} />
         )}
       </div>
     </StaffinglyLayout>

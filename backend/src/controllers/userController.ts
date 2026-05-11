@@ -218,10 +218,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
   });
 };
 
-export const revokeUserDevice = async (
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> => {
+export const revokeUserDevice = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
   const { deviceId, label, ipAddress } = req.body as DeviceTarget;
 

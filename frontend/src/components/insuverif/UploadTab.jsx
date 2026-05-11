@@ -473,11 +473,15 @@ function normalizeExtractionResponse(extraction, docType) {
         ? extraction.data.lowConfidenceFields
         : [],
       overallConfidence:
-        typeof extraction?.data?.overallConfidence === "number" ? extraction.data.overallConfidence : 0,
+        typeof extraction?.data?.overallConfidence === "number"
+          ? extraction.data.overallConfidence
+          : 0,
       requiresReview: Boolean(extraction?.data?.requiresReview),
       channelUsed: extraction?.data?.channelUsed || "unknown",
       processingTimeMs:
-        typeof extraction?.data?.processingTimeMs === "number" ? extraction.data.processingTimeMs : 0,
+        typeof extraction?.data?.processingTimeMs === "number"
+          ? extraction.data.processingTimeMs
+          : 0,
       documentType: extraction?.data?.documentType || docType || "Other Document",
       provider: extraction?.data?.provider || "auto",
       fileName: extraction?.data?.fileName || "",
@@ -637,7 +641,9 @@ export default function UploadTab({ onSubmit, clientId = "" }) {
       setConfidenceScores({});
       setLowConfidenceFields([]);
       setShowForm(false);
-      setError("We couldn't prepare the extracted document review. Please try rescanning the uploaded documents.");
+      setError(
+        "We couldn't prepare the extracted document review. Please try rescanning the uploaded documents."
+      );
     }
   }, [documents]);
 
@@ -827,9 +833,12 @@ export default function UploadTab({ onSubmit, clientId = "" }) {
                 className="flex flex-1 items-start justify-between gap-3 text-left"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Document {document.sequence}</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Document {document.sequence}
+                  </p>
                   <p className="text-xs text-slate-500">
-                    {document.file?.name || "Choose the file type and upload the supporting document."}
+                    {document.file?.name ||
+                      "Choose the file type and upload the supporting document."}
                   </p>
                   {document.extraction ? (
                     <p className="mt-1 text-[11px] text-slate-400">
@@ -1036,7 +1045,9 @@ export default function UploadTab({ onSubmit, clientId = "" }) {
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-700">Extracted Data — Review & Confirm</h3>
+              <h3 className="text-sm font-bold text-slate-700">
+                Extracted Data — Review & Confirm
+              </h3>
               <p className="mt-1 text-xs text-slate-500">
                 We merged the best data found across all uploaded documents.
               </p>
@@ -1147,9 +1158,7 @@ export default function UploadTab({ onSubmit, clientId = "" }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDuplicateDialog(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDuplicateConfirm}>
-              Replace Document
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDuplicateConfirm}>Replace Document</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

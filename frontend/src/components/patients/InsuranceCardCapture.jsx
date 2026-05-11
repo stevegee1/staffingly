@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle,
-  ChevronLeft,
-  FileImage,
-  Loader2,
-  Upload,
-  X,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle, ChevronLeft, FileImage, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import AppSelect from "@/components/ui/app-select";
 
@@ -99,7 +91,7 @@ function StepPill({ number, label, active, complete }) {
   );
 }
 
-function SideCard({ side, scan, selected, onSelect, onDrop, onBrowse, onClear }) {
+function SideCard({ side, scan, selected, onDrop, onBrowse, onClear }) {
   const title = side === "FRONT" ? "Front" : "Back";
   const status = scan.uploadId ? "Scanned" : scan.file ? "Ready" : "Missing";
 
@@ -470,215 +462,215 @@ export default function InsuranceCardCapture({
         </div>
 
         <div className={embedded ? "px-6 py-6" : "min-h-0 flex-1 overflow-y-auto px-6 py-6"}>
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-2">
-                <StepPill
-                  number="1"
-                  label="Upload images"
-                  active={screen === "capture"}
-                  complete={screen === "review"}
-                />
-                <StepPill
-                  number="2"
-                  label="Review auto-fill"
-                  active={screen === "review"}
-                  complete={false}
-                />
-              </div>
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <StepPill
+                number="1"
+                label="Upload images"
+                active={screen === "capture"}
+                complete={screen === "review"}
+              />
+              <StepPill
+                number="2"
+                label="Review auto-fill"
+                active={screen === "review"}
+                complete={false}
+              />
+            </div>
 
-              {screen === "capture" ? (
-                <>
-                  <section className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-                    <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">Card images</h4>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Add the front first, then add the back if more details are printed there.
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-3 lg:min-w-[320px] lg:max-w-[360px]">
-                        <div className="flex items-center justify-between gap-3">
-                          <label className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                            OCR Platform
-                          </label>
-                          <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
-                            {selectedSideCount}/2 selected
-                          </div>
-                        </div>
-                        <AppSelect
-                          value={selectedProvider}
-                          onValueChange={setSelectedProvider}
-                          options={providerOptions}
-                          placeholder="Select OCR platform"
-                          triggerClassName="h-12 rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm focus:ring-[#d9e0ff] focus:border-[#293682]"
-                          contentClassName="rounded-2xl"
-                          disabled={loadingProviders}
-                        />
-                        <p className="text-xs text-slate-500">
-                          {loadingProviders
-                            ? "Loading configured OCR services..."
-                            : selectedProvider
-                              ? "The selected service will scan each side separately."
-                              : "Choose a configured OCR service before extraction."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {CARD_SIDES.map((side) => (
-                        <div key={side} className="space-y-0">
-                          <input
-                            ref={(node) => {
-                              fileInputRefs.current[side] = node;
-                            }}
-                            type="file"
-                            accept="image/jpeg,image/png,image/heic,image/heif"
-                            className="hidden"
-                            onChange={(event) => handleFile(event.target.files?.[0], side)}
-                          />
-                          <SideCard
-                            side={side}
-                            scan={scans[side]}
-                            selected={activeSide === side}
-                            onSelect={() => setActiveSide(side)}
-                            onDrop={(event) => handleDrop(event, side)}
-                            onBrowse={() => {
-                              setActiveSide(side);
-                              fileInputRefs.current[side]?.click();
-                            }}
-                            onClear={() => handleResetSide(side)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </>
-              ) : (
-                <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div
-                    className={`flex items-center gap-3 rounded-2xl p-3 ${
-                      review?.requiresReview
-                        ? "border border-amber-200 bg-amber-50"
-                        : "border border-emerald-200 bg-emerald-50"
-                    }`}
-                  >
-                    {review?.requiresReview ? (
-                      <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    ) : (
-                      <CheckCircle className="h-5 w-5 text-emerald-500" />
-                    )}
+            {screen === "capture" ? (
+              <>
+                <section className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <p
-                        className={`text-sm font-semibold ${
-                          review?.requiresReview ? "text-amber-700" : "text-emerald-700"
-                        }`}
-                      >
-                        {review?.requiresReview
-                          ? "Review required before saving"
-                          : "Auto-fill is ready"}
+                      <h4 className="text-sm font-bold text-slate-800">Card images</h4>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Add the front first, then add the back if more details are printed there.
                       </p>
+                    </div>
+                    <div className="flex flex-col gap-3 lg:min-w-[320px] lg:max-w-[360px]">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                          OCR Platform
+                        </label>
+                        <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
+                          {selectedSideCount}/2 selected
+                        </div>
+                      </div>
+                      <AppSelect
+                        value={selectedProvider}
+                        onValueChange={setSelectedProvider}
+                        options={providerOptions}
+                        placeholder="Select OCR platform"
+                        triggerClassName="h-12 rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm focus:ring-[#d9e0ff] focus:border-[#293682]"
+                        contentClassName="rounded-2xl"
+                        disabled={loadingProviders}
+                      />
                       <p className="text-xs text-slate-500">
-                        Confidence {review?.overallConfidence || 0}% via{" "}
-                        {review?.channelUsed || "OCR"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Scanned sides: {(review?.scannedSides || []).join(", ") || "None"}
+                        {loadingProviders
+                          ? "Loading configured OCR services..."
+                          : selectedProvider
+                            ? "The selected service will scan each side separately."
+                            : "Choose a configured OCR service before extraction."}
                       </p>
                     </div>
                   </div>
 
-                  {(review?.scannedSides || []).length > 0 ? (
-                    <div className="mt-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800">Uploaded card images</h4>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Compare the extracted fields against the original card before saving.
-                          </p>
-                        </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {CARD_SIDES.map((side) => (
+                      <div key={side} className="space-y-0">
+                        <input
+                          ref={(node) => {
+                            fileInputRefs.current[side] = node;
+                          }}
+                          type="file"
+                          accept="image/jpeg,image/png,image/heic,image/heif"
+                          className="hidden"
+                          onChange={(event) => handleFile(event.target.files?.[0], side)}
+                        />
+                        <SideCard
+                          side={side}
+                          scan={scans[side]}
+                          selected={activeSide === side}
+                          onSelect={() => setActiveSide(side)}
+                          onDrop={(event) => handleDrop(event, side)}
+                          onBrowse={() => {
+                            setActiveSide(side);
+                            fileInputRefs.current[side]?.click();
+                          }}
+                          onClear={() => handleResetSide(side)}
+                        />
                       </div>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {review.scannedSides.map((side) => {
-                          const scan = scans[side];
-                          const title = side === "FRONT" ? "Front of card" : "Back of card";
-
-                          return (
-                            <div
-                              key={side}
-                              className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-                            >
-                              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2">
-                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  {title}
-                                </p>
-                                {scan?.file?.name ? (
-                                  <span className="truncate text-[11px] text-slate-400">
-                                    {scan.file.name}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              {scan?.preview && scan.preview !== "pdf" ? (
-                                <img
-                                  src={scan.preview}
-                                  alt={title}
-                                  className="h-48 w-full object-contain bg-slate-50"
-                                />
-                              ) : (
-                                <div className="flex h-48 flex-col items-center justify-center gap-2 px-4 text-center">
-                                  <FileImage className="h-10 w-10 text-slate-300" />
-                                  <p className="text-xs text-slate-500">
-                                    {scan?.file?.name || "No preview available"}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {review?.lowConfidenceFields?.length > 0 ? (
-                    <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                      <strong>Needs review:</strong>{" "}
-                      {review.lowConfidenceFields
-                        .map((field) => FIELD_LABELS[field] || field)
-                        .join(", ")}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-5 space-y-3">
-                    {Object.entries(FIELD_LABELS).map(([field, label]) => {
-                      const value = review?.editedFields?.[field] || "";
-                      const confidence = review?.confidenceScores?.[field];
-                      const isLow = confidence && confidence < CONFIDENCE_THRESHOLD;
-
-                      if (!value && !confidence) return null;
-
-                      return (
-                        <div key={field}>
-                          <label className="mb-1 flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            {label}
-                            {confidence ? <ConfidenceBadge score={confidence} /> : null}
-                          </label>
-                          <input
-                            value={value}
-                            onChange={(event) => updateField(field, event.target.value)}
-                            className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                              isLow
-                                ? "border-amber-300 bg-amber-50/50 focus:ring-amber-200"
-                                : "border-emerald-200 bg-emerald-50/50 focus:ring-emerald-200"
-                            }`}
-                          />
-                        </div>
-                      );
-                    })}
+                    ))}
                   </div>
                 </section>
-              )}
-            </div>
+              </>
+            ) : (
+              <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div
+                  className={`flex items-center gap-3 rounded-2xl p-3 ${
+                    review?.requiresReview
+                      ? "border border-amber-200 bg-amber-50"
+                      : "border border-emerald-200 bg-emerald-50"
+                  }`}
+                >
+                  {review?.requiresReview ? (
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <CheckCircle className="h-5 w-5 text-emerald-500" />
+                  )}
+                  <div>
+                    <p
+                      className={`text-sm font-semibold ${
+                        review?.requiresReview ? "text-amber-700" : "text-emerald-700"
+                      }`}
+                    >
+                      {review?.requiresReview
+                        ? "Review required before saving"
+                        : "Auto-fill is ready"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Confidence {review?.overallConfidence || 0}% via{" "}
+                      {review?.channelUsed || "OCR"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Scanned sides: {(review?.scannedSides || []).join(", ") || "None"}
+                    </p>
+                  </div>
+                </div>
+
+                {(review?.scannedSides || []).length > 0 ? (
+                  <div className="mt-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800">Uploaded card images</h4>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Compare the extracted fields against the original card before saving.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {review.scannedSides.map((side) => {
+                        const scan = scans[side];
+                        const title = side === "FRONT" ? "Front of card" : "Back of card";
+
+                        return (
+                          <div
+                            key={side}
+                            className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                          >
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                {title}
+                              </p>
+                              {scan?.file?.name ? (
+                                <span className="truncate text-[11px] text-slate-400">
+                                  {scan.file.name}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {scan?.preview && scan.preview !== "pdf" ? (
+                              <img
+                                src={scan.preview}
+                                alt={title}
+                                className="h-48 w-full object-contain bg-slate-50"
+                              />
+                            ) : (
+                              <div className="flex h-48 flex-col items-center justify-center gap-2 px-4 text-center">
+                                <FileImage className="h-10 w-10 text-slate-300" />
+                                <p className="text-xs text-slate-500">
+                                  {scan?.file?.name || "No preview available"}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {review?.lowConfidenceFields?.length > 0 ? (
+                  <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                    <strong>Needs review:</strong>{" "}
+                    {review.lowConfidenceFields
+                      .map((field) => FIELD_LABELS[field] || field)
+                      .join(", ")}
+                  </div>
+                ) : null}
+
+                <div className="mt-5 space-y-3">
+                  {Object.entries(FIELD_LABELS).map(([field, label]) => {
+                    const value = review?.editedFields?.[field] || "";
+                    const confidence = review?.confidenceScores?.[field];
+                    const isLow = confidence && confidence < CONFIDENCE_THRESHOLD;
+
+                    if (!value && !confidence) return null;
+
+                    return (
+                      <div key={field}>
+                        <label className="mb-1 flex items-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          {label}
+                          {confidence ? <ConfidenceBadge score={confidence} /> : null}
+                        </label>
+                        <input
+                          value={value}
+                          onChange={(event) => updateField(field, event.target.value)}
+                          className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                            isLow
+                              ? "border-amber-300 bg-amber-50/50 focus:ring-amber-200"
+                              : "border-emerald-200 bg-emerald-50/50 focus:ring-emerald-200"
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
 
         {globalError ? (
